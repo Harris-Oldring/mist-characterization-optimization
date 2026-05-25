@@ -1,5 +1,13 @@
 # mist-characterization-optimization
-Useful scripts, CAEN DT5751 digitizer data, and Jupyter notebooks created while optimizing the P-ONE-D MIST characterization process.
+Useful scripts, CAEN DT5751 digitizer data, and Jupyter notebooks created while optimizing the P-ONE-D MIST characterization process. 
+
+## Description of Folders and Scripts
+ * `characterization_script_v3` : Contains the analysis scripts
+    * `characterization3.py` : The main analysis script
+    * `batch_characterization3.sh` : A script to run `characterization3.py` on several run results at once
+ * `playing_with_data` : Contains several Jupyter notebooks, which were used to develop the analysis scripts
+    * `fitting_experimenting.ipynb` : Was used to explore fitting techniques
+ * `settings_experimentation` : Sample data with descriptions
 
 ## Installation
 ### Prerequisites
