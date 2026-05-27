@@ -2,7 +2,7 @@
 Useful scripts, CAEN DT5751 digitizer data, and Jupyter notebooks created while optimizing the P-ONE-D MIST characterization process. 
 
 ## Description of Folders and Scripts
- * `characterization_script_v3` : Contains the analysis scripts
+ * `src` : Contains the analysis scripts
     * `characterization3.py` : The main analysis script
     * `batch_characterization3.sh` : A script to run `characterization3.py` on several run results at once
  * `playing_with_data` : Contains several Jupyter notebooks, which were used to develop the analysis scripts
@@ -37,10 +37,11 @@ Here are the instructions and requirements for setting up mist-characterization-
    ```
 
 ## Usage
-### `characterization_script_v3.py`
+### `characterization3.py`
 This is the current characterization script, which allows you to perform analysis on data returned by the CAEN DT5751 digitizer using the CoMPASS software with "Acquisition/Save Raw Data" selected. This may be run from the terminal or used as a class. 
-#### Running `characterization_script_v3.py` in Terminal
-`characterization_script_v3` takes the following positional arguments:
+
+#### Running `characterization3.py` in Terminal
+`characterization3.py` takes the following positional arguments:
  - `n_channels`: Number of channels to analyze.
  - `parent_dir`: Parent directory containing the RAW subdirectory with channel data files.
 Additional arguments can also be supplied to adjust how analysis is performed:\
@@ -58,6 +59,7 @@ Additional arguments can also be supplied to adjust how analysis is performed:\
  - `--log` is the file name and path for logging output.\
   (default: 'characterization.log')
  - `characterization3.py` creates intermediate files before producing a result. If `--no_clean_up` is supplied, then these files are not removed. This may be necessary when repeatedly appending to the same location.
+
 #### Configuring Your Analysis
 If there is a piece of analysis, a fit line, or a fit test that you would like to do, you can create it. To configure a piece of analysis which is not a fit, create a function with arguments `*data, *args` and returns a single value, where `*data` is the data that you need for the analysis (ex. `time_data`, `energy_data`) and arguments are optional supplemental arguments that must be inputted in the configuration. If you would like your function to produce a plot, add fig, ax as your last two return values. Once this has been complete, add a new entry in self.general_analyses_config that follows this structure:
 ```python
@@ -95,15 +97,15 @@ To configure a fit test, create a function which takes as its arguments `data, f
 ```
 
 #### Examples
-Suppose you wanted to look at how well a LanGauss distribution fits the individual channel height data for two runs, run1 and run2, which used all four channels. In this case, you could run the following two commands, and then compare the pdfs that you get
+Suppose you wanted to look at how well a LanGauss distribution fits the individual channel height data for two runs, `test_0` and `test_8`, which used three channels. In this case, you could run the following two commands, and then compare the pdfs that you get
 ```bash
-python3 characterization3.py 4 run1 --scope individual --general_analysis None --fit_analysis Landau-Gaussian Height --save run1_langauss --plots run1_langauss 
-python3 characterization3.py 4 run2 --scope individual --general_analysis None --fit_analysis Landau-Gaussian Height --save run2_langauss --plots run2_langauss 
+python3 src/characterization3.py 3 settings_experimentation/test_0 --scope individual --general_analysis None --fit_analysis Landau-Gaussian Height --save settings_experimentation/results0 --plots settings_experimentation/results0 
+python3 src/characterization3.py 3 settings_experimentation/test_8 --scope individual --general_analysis None --fit_analysis Landau-Gaussian Height --save settings_experimentation/results8 --plots settings_experimentation/results8 
 ```
 
-If you would like to look at how the baseline changed for all three channels of run3, you would use this command:
+If you would like to look at how the baseline changed for all three channels of `test_6`, you would use this command:
 ```bash
-python3 characterization3.py 3 run3 --scope aggregate --general_analysis Average Baseline --fit_analysis None --plots y
+python3 src/characterization3.py 3 settings_experimentation/test_6 --scope aggregate --general_analysis Average Baseline --fit_analysis None --plots y
 ```
 
 ### `batch_characterization.sh`
@@ -120,7 +122,7 @@ A description of the arguments is as follows:
  - `path_to_characterization3` (opt) : If characterization3.py is not in the same directory as batch_characterization3.sh, will need to provide the path to characterization3.py as the 4th argument.   
 
 #### Examples
-To perform batch characterization of the first 5 files in settings_experimentation, you would do 
+To perform batch characterization of the first 5 run results in settings_experimentation, you would do 
 ```bash
-./batch_characterization3.sh settings_experimentation 0 5
+./src/batch_characterization3.sh settings_experimentation 0 5
 ```

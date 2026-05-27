@@ -3426,8 +3426,8 @@
         <dataSocket>false</dataSocket>
         <autoTriggerEnabled>false</autoTriggerEnabled>
         <timedRunEnabled>true</timedRunEnabled>
-        <timedRunDuration>1350000</timedRunDuration>
-        <runId>test_22</runId>
+        <timedRunDuration>3600000</timedRunDuration>
+        <runId>test_20</runId>
         <autoIncrementRunId>true</autoIncrementRunId>
         <fileFormatList>ROOT</fileFormatList>
         <fileFormatSpectrum>N42</fileFormatSpectrum>
