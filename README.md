@@ -1,13 +1,22 @@
 # mist-characterization-optimization
 Useful scripts, CAEN DT5751 digitizer data, and Jupyter notebooks created while optimizing the P-ONE-D MIST characterization process. 
 
-## Description of Folders and Scripts
+## Description of Directories, Scripts, and Notebooks
  * `src` : Contains the analysis scripts
     * `characterization3.py` : The main analysis script
     * `batch_characterization3.sh` : A script to run `characterization3.py` on several run results at once
- * `playing_with_data` : Contains several Jupyter notebooks, which were used to develop the analysis scripts
-    * `fitting_experimenting.ipynb` : Was used to explore fitting techniques
- * `settings_experimentation` : Sample data with descriptions
+    * `compass_result_splitter.py` : A script to break a given run result into several smaller run results of a given duration
+    * `batch_split_and_characterize` : Bare-bones script helpful to run `compass_result_splitter.py` and `batch_characterization3.sh` many times
+ * `analysis` : Contains several Jupyter notebooks, which were used to develop the analysis scripts
+    * `characterization_development.ipynb` : Development notebooks for the current version of `characterization3.py`
+       * `fitting_experimenting1.ipynb` : Was used to explore fitting techniques
+       * `fitting_experimenting2.ipynb` : Was used to explore fitting techniques, specifically binning
+       * `testing_fit_testing.ipynb` : Was used to explore fit tests
+    * `sample_duration.ipynb` : Used to explore how the sample duration of data affects the uncertainty of various analyses
+       * `varied_sample_durations1.ipynb` : Initial exploration of how the sample duration of data affects the uncertainty of fit parameters for the event rate analysis, which fits a LanGauss distribution to the histogram of event rates calculated from inter-event times
+       * `varied_sample_durations2.ipynb` : Further analysis of the same kind which is cleaner, clearer, and more robust
+       * `variance.ipynb` : Used to explore how our fit parameters and their uncertainties change between samples of the same duration
+ * `data` : Sample data with descriptions
 
 ## Installation
 ### Prerequisites
@@ -126,3 +135,36 @@ To perform batch characterization of the first 5 run results in settings_experim
 ```bash
 ./src/batch_characterization3.sh settings_experimentation 0 5
 ```
+
+### `compass_result_splitter.py`
+This script splits a CoMPASS run result into synchronized, fixed-duration chunks while preserving the original `RAW` folder and channel file structure.
+
+#### Running `compass_result_splitter.py` in Terminal
+`compass_result_splitter.py` takes the following positional arguments:
+ - `parent_dir`: Parent directory containing the `RAW` subdirectory with channel ROOT files.
+ - `n_channels`: Number of channels to parse.
+ - `duration`: Duration of each chunk in seconds.
+Additional optional arguments allow you to control output location and ROOT tree details:
+ - `-o, --output-dir`: Target overarching output directory (default: same location as `parent_dir`).
+ - `-t, --tree-name`: TTree name inside the ROOT files (default: `Data_R;1`).
+ - `--time-unit-factor`: Timestamp units per second. Use `1e12` for picoseconds or `1e9` for nanoseconds (default: `1e12`).
+ - `--timestamp-branch`: Timestamp branch name inside the ROOT tree (default: `Timestamp`).
+
+The script writes output in the form:
+
+```
+<output_dir>/<parent_dir_name>_<duration>/test_<i>/RAW/CH<channel>.root
+```
+
+Each output chunk is generated from the common time windows present in all channels.
+
+#### Examples
+To split `settings_experimentation/test_0` into 60-second synchronized chunks using three channels:
+```bash
+python3 src/compass_result_splitter.py settings_experimentation/test_0 3 60
+```
+To write the chunked results to a custom output directory:
+```bash
+python3 src/compass_result_splitter.py settings_experimentation/test_0 3 60 -o split_outputs
+```
+

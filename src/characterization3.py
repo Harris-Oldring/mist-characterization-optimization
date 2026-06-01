@@ -44,7 +44,7 @@ polarity = 'positive' # Polarity of the signal, either 'positive' or 'negative'.
 
 
 class Characterize:
-   def __init__(self, n_channels, parent_dir, scope='both', general_analysis_names=['Number of Events', 'Sample Duration', 'Average Event Rate', 'Average Baseline'], fit_analysis_names=['Landau-Gaussian Height', 'Exponentially Modified Gaussian Energy'], fit_tests=['kolmogorov_smirnov', 'chi_squared_per_ndof'], save=None, mode='w', plots=None, log=None, clean_up=True):
+   def __init__(self, n_channels, parent_dir, scope='both', general_analysis_names=['Number of Events', 'Sample Duration', 'Average Event Rate', 'Average Baseline'], fit_analysis_names=['LanGauss Height', 'Exponentially Modified Gaussian Energy'], fit_tests=['kolmogorov_smirnov', 'chi_squared_per_ndof'], save=None, mode='w', plots=None, log=None, clean_up=True):
       '''
       n_channels (int): Number of channels to analyze.
       parent_dir (str): Parent directory containing the RAW subdirectory with channel data files.
@@ -166,7 +166,8 @@ class Characterize:
       self.fit_analyses_config = [
          {
             'name': 'Landau Height',
-            'data_type': 'Height',
+            'title': 'Distribution of Waveform Peaks',
+            'data_type': 'Height',         
             'data_transform_function': None,
             'fit_func': landau_fit,
             'pdf_func': lambda x, params: landau.pdf(x, loc=params[0], scale=params[2]),
@@ -177,19 +178,21 @@ class Characterize:
             'threshold' : 0.001
          },
          {
-            'name': 'Landau-Gaussian Height',
+            'name': 'LanGauss Height',
+            'title': 'Distribution of Waveform Peaks',
             'data_type': 'Height',
             'data_transform_function': None,
             'fit_func': landau_star_gauss_fit_fastest,
             'pdf_func': lambda x, params: landau_star_gauss_fastest(params[0], params[2], params[4], params[6], np.min(x), np.max(x))(x),
             'param_names': ['mu', 'sigma_mu', 'c', 'sigma_c', 'mean', 'sigma_mean', 'std', 'sigma_std'],
-            'fit_type': 'Landau-Gaussian',
+            'fit_type': 'LanGauss',
             'xlabel': 'Wavelength Peak',
             'units': 'mV',
             'threshold' : 0.001
          },
          {
             'name': 'Exponentially Modified Gaussian Energy',
+            'title': 'Energy Spectrum',
             'data_type': 'Energy',
             'data_transform_function': None,
             'fit_func': exp_mod_gauss_fit,
@@ -198,7 +201,7 @@ class Characterize:
             'fit_type': 'Exponentially Modified Gaussian',
             'xlabel': 'ADC [Channel]',
             'units': '',
-            'threshold' : 0.001
+            'threshold' : None
          },
          {
             'name': 'Gaussian Event Rate', # NOTE: This doesn't seem to be an appropriate way of analyzing event rate, but I have left it here anyways
@@ -381,19 +384,20 @@ class Characterize:
       fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 9))
    
       ## PDF Fit plot
-      ax1.set_title(f"{fit_analysis['name']} ({scope})")
+      ax1.set_title(f"{fit_analysis['title']} ({scope})")
       ax1.set_xlabel(xlabel)
       ax1.set_ylabel("Frequency")
-      ax1.hist(data, bins=249, density=True, histtype="step")
+      ax1.hist(data, bins=round(np.sqrt(len(data))), density=True,histtype="step")
       ax1.plot(xfit, yfit, label=f'{fit_type} PDF Fit')
       ax1.legend()
 
       ## CDF Fit plot
       y_cdf = pdf2cdf(xfit, yfit)
-      ax2.set_title(f"{fit_analysis['name']} ({scope})")
+      ax2.set_title(f"{fit_analysis['title']} ({scope})")
       ax2.set_xlabel(xlabel)
       ax2.set_ylabel("Frequency")
-      ax2.hist(data, bins=249, density=True, cumulative=True, histtype="step")
+      ax2.set_ylim(1e-4,1.1)
+      ax2.hist(data, bins=round(np.sqrt(len(data))), density=True, cumulative=True, histtype="step")
       ax2.plot(xfit, y_cdf, label=f'{fit_type} CDF Fit')
       ### Plot threshold, if Applicable
       if threshold is not None:
@@ -827,7 +831,7 @@ def main():
    parser.add_argument('n_channels', type=int, help="Number of channels to analyze.")
    parser.add_argument('--scope', type=str, choices=['individual', 'aggregate', 'both'], default='both', help="Scope of analysis: 'individual', 'aggregate', or 'both' (default: 'both').")
    parser.add_argument('--general_analyses', nargs='+', default=['Number of Events', 'Sample Duration', 'Average Event Rate', 'Average Baseline'], help="List of general analyses to perform by name (default: ['Number of Events', 'Sample Duration', 'Average Event Rate', 'Average Baseline']).")
-   parser.add_argument('--fit_analyses', nargs='+', default=['Landau-Gaussian Height', 'Exponentially Modified Gaussian Energy'], help="List of fit analyses to perform by name (default: ['Landau-Gaussian Height', 'Exponentially Modified Gaussian Energy']).")
+   parser.add_argument('--fit_analyses', nargs='+', default=['LanGauss Height', 'Exponentially Modified Gaussian Energy'], help="List of fit analyses to perform by name (default: ['LanGauss Height', 'Exponentially Modified Gaussian Energy']).")
    parser.add_argument('--fit_tests', nargs='+', choices=['kolmogorov_smirnov', 'anderson_darling', 'chi_squared', 'chi_squared_per_ndof'], default=['kolmogorov_smirnov', 'chi_squared_per_ndof'], help="List of fit tests to perform (default: ['kolmogorov_smirnov', 'chi_squared_per_ndof']).")
    parser.add_argument('--save', type=str, default=None, help="File path to save results as a CSV, or None to not save results (default: None).")
    parser.add_argument('--mode', type=str, choices=['w', 'a'], default='w', help="File mode for saving results: 'w' for write (overwrite) or 'a' for append (default: 'w').")

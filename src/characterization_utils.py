@@ -30,7 +30,7 @@ def load_file(file, FSR=1000, bits=10, digitizer_offset=148+8, n_baseline=80, n_
       print(rootfile.keys())
       print(rootfile.keys(filter_classname="TTree"))
       print(rootfile.classnames())
-      raise FileExistsError("root file contains either 0 or more than 1 TTrees")
+      raise FileExistsError("root file contains 0 TTrees")
    tree = rootfile[rootfile.keys(filter_classname="TTree")[0]] # Uses the first TTree in the root file
 
    # Initialize lists to store the extracted data
@@ -166,7 +166,16 @@ def pdf2cdf(x,y_pdf):
    y_cdf[1:] = np.cumsum((y_pdf[:-1] + y_pdf[1:]) / 2 * dx)
    return y_cdf / y_cdf[-1]
 
-def landau_star_gauss(mu, c, x0, sigma, l, u, grid_size=300):
+def cdf_hist(n, bins):
+   '''
+   returns half_bins, cdf, the x and y data that makes up your discrete cdf
+   '''
+   cdf = np.cumsum(n).astype(np.float64)
+   cdf /= cdf[-1]  # Normalize so last value is 1.0
+   half_bins = np.array([(bins[i] + bins[i+1]) / 2 for i in range(len(bins) - 1)])
+   return half_bins, cdf
+
+def landau_star_gauss(mu, c, x0, sigma, l, u, grid_size=300, cdf=False):
    '''
    Returns an interpolation of a Landau distribution convoluted with a Gaussian distribution
    mu,c are parameters corresponding to the location and spread of the Landau Distribution
@@ -188,9 +197,11 @@ def landau_star_gauss(mu, c, x0, sigma, l, u, grid_size=300):
    conv_values /= norm_factor
    # Interpolate
    # return interp_func = interp1d(x_grid, conv_values, kind='linear', bounds_error=False, fill_value=0) # For speed
+   if cdf:
+      return BarycentricInterpolator(x_grid,pdf2cdf(x_grid,conv_values)) # Better Interpolation   
    return BarycentricInterpolator(x_grid,conv_values) # Better Interpolation
 
-def faster_landau_star_gauss(mu, c, x0, sigma, l, u, grid_size=300):
+def faster_landau_star_gauss(mu, c, x0, sigma, l, u, grid_size=300, cdf=False):
    '''
    Returns an interpolation of a Landau distribution convoluted with a Gaussian distribution
    mu,c are parameters corresponding to the location and spread of the Landau Distribution
@@ -211,10 +222,12 @@ def faster_landau_star_gauss(mu, c, x0, sigma, l, u, grid_size=300):
    norm_factor = np.trapezoid(conv_values, x_grid) # For speed
    conv_values /= norm_factor
    # Interpolate
+   if cdf:
+      return interp1d(x_grid, pdf2cdf(x_grid, conv_values), kind='linear', bounds_error=False, fill_value=0) # For speed
    return interp1d(x_grid, conv_values, kind='linear', bounds_error=False, fill_value=0) # For speed
    # return BarycentricInterpolator(x_grid,conv_values) # Better Interpolation
 
-def landau_star_gauss_fastest(mu, c, x0, sigma, l, u, grid_size=300):
+def landau_star_gauss_fastest(mu, c, x0, sigma, l, u, grid_size=300, cdf = False):
    '''
    Returns an interpolation of a Landau distribution convoluted with a Gaussian distribution
    mu,c are parameters corresponding to the location and spread of the Landau Distribution
@@ -228,6 +241,8 @@ def landau_star_gauss_fastest(mu, c, x0, sigma, l, u, grid_size=300):
    gauss_vals  = norm.pdf(x_grid, loc=x0, scale=sigma)
    conv = np.convolve(landau_vals, gauss_vals, mode='same') * dx
    conv /= np.trapezoid(conv, x_grid)
+   if cdf:
+      return interp1d(x_grid, pdf2cdf(x_grid,conv))
    return interp1d(x_grid, conv)
 
 # GENERAL ANALYSIS FUNCTIONS
@@ -327,7 +342,7 @@ def gauss_fit(data):
    mean,sigma_mean,std,sigma_std - The fit parameters mu,c as well as an estimate of their error
    '''
    print("Fitting Gaussian...")
-   n,bins = np.histogram(data,bins=len(data),density=True)
+   n,bins = np.histogram(data,bins=int(np.sqrt(len(data))),density=True)
    half_bins = np.array([(bins[i]+bins[i+1])/2 for i in range(len(bins)-1)])
    print(np.mean(data),np.std(data))
    popt, pcov = curve_fit(lambda x, mu, c: norm.pdf(x, loc=mu, scale=c), half_bins, n,p0=[np.mean(data), np.std(data)])
@@ -341,51 +356,63 @@ def landau_fit(data):
    Returns:
    mu,sigma_mu,c,sigma_c - The fit parameters mu,c as well as an estimate of their error
    '''
-   n,bins = np.histogram(data,bins=len(data),density=True)
-   half_bins = np.array([(bins[i]+bins[i+1])/2 for i in range(len(bins)-1)])
-   popt, pcov = curve_fit(lambda x, mu, c: landau.pdf(x, loc=mu, scale=c), half_bins, n)
+   n,bins = np.histogram(data, bins=int(np.sqrt(len(data))))
+   half_bins, cdf = cdf_hist(n,bins)
+   popt, pcov = curve_fit(lambda x, mu, c: landau.cdf(x, loc=mu, scale=c), half_bins, cdf)
    mu,c = popt
    sigma_mu,sigma_c=np.sqrt(np.diag(pcov))
    return mu,sigma_mu,c,sigma_c
 
-def landau_star_gauss_fit(data):
+def landau_star_gauss_fit(data,mu_l=1,mu_u=500,c_l=1,c_u=200,x0_l=1,x0_u=500,std_l=0.01,std_u=150):
    '''
    Given a set of data, fits a Landau distribution convoluted with a Gaussian distribution
    Returns:
    mu,sigma_mu,c,sigma_c,mean,sigma_mean,std,sigma_std - The fit parameters mu,c,mean,std as well as an estimate of their error
    '''
    l,u = min(data),max(data)
-   n, bins = np.histogram(data, bins=len(data), density=True)
-   half_bins = np.array([(bins[i] + bins[i+1]) / 2 for i in range(len(bins) - 1)])
+   n,bins = np.histogram(data, bins=int(np.sqrt(len(data))))
+   half_bins, cdf = cdf_hist(n,bins)
    mu0,_,c0,_ = landau_fit(data)
-   # Initial guesses: based on prior Landau fit and data estimates
-   p0 = [mu0, c0, np.mean(half_bins), np.std(half_bins)]  # mu, c, mean, std
+   x00, std0 = np.mean(half_bins), np.std(half_bins)/2
 
    # Fit with bounds to prevent negative sigma
-   bounds = ([0, 0, np.min(half_bins), 0], [np.inf, np.inf, np.max(half_bins), np.inf])
-   popt, pcov = curve_fit(lambda x, mu, c,x0, sigma: landau_star_gauss(mu, c, x0, sigma,l,u)(x),
-                       half_bins, n, p0=p0, bounds=bounds)
+   bounds = ([mu_l, c_l, min(np.min(half_bins),x0_l), std_l], [mu_u, c_u, max(np.max(half_bins),x0_u), std_u])
+   if mu0>mu_u or mu0<mu_l: mu0=(mu_l+mu_u)/2
+   if c0>c_u or c0<c_l: c0=(c_l+c_u)/2
+   if x00>x0_u or x00<x0_l: x00=(x0_l+x0_u)/2
+   if std0>mu_u or std0<std_l: std0=(std_l+std_u)/2
+
+   # Initial guesses: based on prior Landau fit and data estimates
+   p0 = [mu0, c0, x00, std0]  # mu, c, mean, std
+   popt, pcov = curve_fit(lambda x, mu, c,x0, sigma: landau_star_gauss(mu, c, x0, sigma,l,u,cdf=True)(x),
+                       half_bins, cdf, p0=p0, bounds=bounds)
    mu,c,mean,std = popt
    sigma_mu,sigma_c,sigma_mean,sigma_std = np.sqrt(np.diag(pcov))
    return mu,sigma_mu,c,sigma_c,mean,sigma_mean,std,sigma_std
 
-def landau_star_gauss_fit_fastest(data):
+def landau_star_gauss_fit_fastest(data,mu_l=1,mu_u=500,c_l=1,c_u=200,x0_l=1,x0_u=500,std_l=0.01,std_u=150):
    '''
    Given a set of data, fits a Landau distribution convoluted with a Gaussian distribution
    Returns:
    mu,sigma_mu,c,sigma_c,mean,sigma_mean,std,sigma_std - The fit parameters mu,c,mean,std as well as an estimate of their error
    '''
    l,u = min(data),max(data)   
-   n, bins = np.histogram(data, bins=len(data), density=True)
-   half_bins = np.array([(bins[i] + bins[i+1]) / 2 for i in range(len(bins) - 1)])
+   n,bins = np.histogram(data, bins=int(np.sqrt(len(data))))
+   half_bins, cdf = cdf_hist(n,bins)
    mu0,_,c0,_ = landau_fit(data)
-   # Initial guesses: based on prior Landau fit and data estimates
-   p0 = [mu0, c0, np.mean(half_bins), np.std(half_bins)]  # mu, c, mean, std
+   x00, std0 = np.mean(half_bins), np.std(half_bins)/2
 
    # Fit with bounds to prevent negative sigma
-   bounds = ([0, 0, np.min(half_bins), 0], [np.inf, np.inf, np.max(half_bins), np.inf])
-   popt, pcov = curve_fit(lambda x, mu, c,x0, sigma: landau_star_gauss_fastest(mu, c, x0, sigma,l,u)(x),
-                       half_bins, n, p0=p0, bounds=bounds)
+   bounds = ([mu_l, c_l, min(np.min(half_bins),x0_l), std_l], [mu_u, c_u, max(np.max(half_bins),x0_u), std_u])
+   if mu0>mu_u or mu0<mu_l: mu0=(mu_l+mu_u)/2
+   if c0>c_u or c0<c_l: c0=(c_l+c_u)/2
+   if x00>x0_u or x00<x0_l: x00=(x0_l+x0_u)/2
+   if std0>mu_u or std0<std_l: std0=(std_l+std_u)/2
+
+   # Initial guesses: based on prior Landau fit and data estimates
+   p0 = [mu0, c0, x00, std0]  # mu, c, mean, std
+   popt, pcov = curve_fit(lambda x, mu, c,x0, sigma: landau_star_gauss_fastest(mu, c, x0, sigma,l,u,cdf=True)(x),
+                       half_bins, cdf, p0=p0, bounds=bounds)
    mu,c,mean,std = popt
    sigma_mu,sigma_c,sigma_mean,sigma_std = np.sqrt(np.diag(pcov))
    return mu,sigma_mu,c,sigma_c,mean,sigma_mean,std,sigma_std
@@ -396,7 +423,7 @@ def exp_mod_gauss_fit(data):
    Returns:
    K,sigma_K,mean,sigma_mean,std,sigma_std - The fit parameters mu,c as well as an estimate of their error
    '''
-   n,bins = np.histogram(data,bins=len(data),density=True)
+   n,bins = np.histogram(data,bins=int(np.sqrt(len(data))),density=True)
    half_bins = np.array([(bins[i]+bins[i+1])/2 for i in range(len(bins)-1)])
    p0 = np.array([1,np.mean(data),np.std(data)])
    popt, pcov = curve_fit(lambda x, K, mean, std: exponnorm.pdf(x, K, mean,std), half_bins, n,p0=p0)
@@ -432,7 +459,7 @@ def chi_squared(data, fit_cdf, n_params):
    Performs a Chi-Squared test to compare the empirical distribution of the data with the fitted distribution.
    Returns the Chi-Squared statistic and p-value.
    '''
-   n, bins = np.histogram(data, bins="fd", density=False)
+   n, bins = np.histogram(data, bins=round(np.sqrt(len(data))), density=False)
    # print(f"Number of bins: {len(bins)-1}")
    expected_probs = fit_cdf(bins[1:]) - fit_cdf(bins[:-1])
 
@@ -453,7 +480,7 @@ def chi_squared_per_ndof(data, fit_cdf, n_params):
    Performs a Chi-Squared test to compare the empirical distribution of the data with the fitted distribution.
    Returns the Chi-Squared statistic and p-value.
    '''
-   n, bins = np.histogram(data, bins="fd", density=False)
+   n, bins = np.histogram(data, bins=round(np.sqrt(len(data))), density=False)
    ndof = len(n) - 1
    expected_probs = fit_cdf(bins[1:]) - fit_cdf(bins[:-1])
 

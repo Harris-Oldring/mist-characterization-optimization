@@ -1,2 +1,8 @@
 .DS_Store
 *.log
+data/results/*
+data/test_0_*
+data/test_1_*
+analysis/test_0
+analysis/test_1
+analysis/Scenario_5_Revised_Run
