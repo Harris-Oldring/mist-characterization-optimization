@@ -12,6 +12,7 @@ from characterization_utils import (
     times2event_rates,
     exp_mod_gauss_fit,
     landau_star_gauss_fit_fastest,
+    langauss_fit,
     pdf2cdf,
     remove_overflow2,
     average_event_rate,
@@ -30,6 +31,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import pandas as pd
+from landaupy import langauss
 
 n_baseline = 80 # This is the number of samples used to establish a baseline for each event (called N Samples Baseline on CoMPASS - sort of)
 # I don't know why this has been set to 80. 256 is what is normally used on the CoMPASS GUI to get the energy measurements
@@ -178,14 +180,27 @@ class Characterize:
             'threshold' : 0.001
          },
          {
-            'name': 'LanGauss Height',
+            'name': 'Old (wrong) Langauss Height',
             'title': 'Distribution of Waveform Peaks',
             'data_type': 'Height',
             'data_transform_function': None,
             'fit_func': landau_star_gauss_fit_fastest,
             'pdf_func': lambda x, params: landau_star_gauss_fastest(params[0], params[2], params[4], params[6], np.min(x), np.max(x))(x),
             'param_names': ['mu', 'sigma_mu', 'c', 'sigma_c', 'mean', 'sigma_mean', 'std', 'sigma_std'],
-            'fit_type': 'LanGauss',
+            'fit_type': 'Old Langauss',
+            'xlabel': 'Wavelength Peak',
+            'units': 'mV',
+            'threshold' : 0.001
+         },
+         {
+            'name': 'Langauss Height',
+            'title': 'Distribution of Waveform Peaks',
+            'data_type': 'Height',
+            'data_transform_function': None,
+            'fit_func': langauss_fit,
+            'pdf_func': lambda x, params: langauss.pdf(x, landau_x_mpv=params[0], landau_xi=params[2], gauss_sigma=params[4]),
+            'param_names': ['mu', 'sigma_mu', 'c', 'sigma_c', 'mean', 'sigma_mean', 'std', 'sigma_std'],
+            'fit_type': 'Langauss',
             'xlabel': 'Wavelength Peak',
             'units': 'mV',
             'threshold' : 0.001
@@ -839,7 +854,7 @@ def main():
    parser.add_argument('--log', type=str, default='characterization.log', help="File path for logging output (default: 'characterization.log').")
    parser.add_argument('--no_clean_up', action='store_true', help="Whether to not clean up intermediate files after saving results.")
    args = parser.parse_args()
-   
+
    characterizer = Characterize(
       n_channels=args.n_channels,
       parent_dir=args.parent_dir,

@@ -5,6 +5,7 @@ from scipy.interpolate import BarycentricInterpolator,interp1d,make_interp_splin
 from scipy.integrate import quad
 from scipy.optimize import curve_fit,root_scalar
 import uproot
+from landaupy import langauss
 
 # DATA PROCESSING FUNCTIONS
 ## Loading and basic processing
@@ -362,6 +363,23 @@ def landau_fit(data):
    mu,c = popt
    sigma_mu,sigma_c=np.sqrt(np.diag(pcov))
    return mu,sigma_mu,c,sigma_c
+
+def langauss_fit(data):
+   '''
+   Given a set of data, fits a Langauss distribution
+   Returns:
+   landau_x_mpv, landau_xi, gauss_sigma - The fit parameters as well as an estimate of their error
+   '''
+   n,bins = np.histogram(data, bins=int(np.sqrt(len(data))))
+   half_bins, cdf = cdf_hist(n,bins)
+
+   mu0,_,c0,_ = landau_fit(data)
+   p0 = [mu0, c0, 6*c0]  # mu, c, mean, std
+   popt, pcov = curve_fit(lambda x, landau_x_mpv, landau_xi, gauss_sigma: langauss.cdf(x, landau_x_mpv=landau_x_mpv, landau_xi=landau_xi, gauss_sigma=gauss_sigma), half_bins, cdf, p0=p0)
+
+   landau_x_mpv, landau_xi, gauss_sigma = popt
+   sigma_landau_x_mpv,sigma_landau_xi,sigma_gauss_sigma=np.sqrt(np.diag(pcov))
+   return landau_x_mpv, sigma_landau_x_mpv, landau_xi, sigma_landau_xi, gauss_sigma, sigma_gauss_sigma
 
 def landau_star_gauss_fit(data,mu_l=1,mu_u=500,c_l=1,c_u=200,x0_l=1,x0_u=500,std_l=0.01,std_u=150):
    '''
