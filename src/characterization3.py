@@ -199,7 +199,7 @@ class Characterize:
             'data_transform_function': None,
             'fit_func': langauss_fit,
             'pdf_func': lambda x, params: langauss.pdf(x, landau_x_mpv=params[0], landau_xi=params[2], gauss_sigma=params[4]),
-            'param_names': ['mu', 'sigma_mu', 'c', 'sigma_c', 'mean', 'sigma_mean', 'std', 'sigma_std'],
+            'param_names': ['landau_x_mpv', 'sigma_landau_x_mpv', 'landau_xi', 'sigma_landau_xi', 'gauss_sigma', 'sigma_gauss_sigma'],
             'fit_type': 'Langauss',
             'xlabel': 'Wavelength Peak',
             'units': 'mV',
