@@ -247,7 +247,7 @@ def landau_star_gauss_fastest(mu, c, x0, sigma, l, u, grid_size=300, cdf = False
    return interp1d(x_grid, conv)
 
 # GENERAL ANALYSIS FUNCTIONS
-def average_event_rate(time_data, overflows):
+def average_event_rate(time_data):
    '''
    Calculate the average event rate for the provided timestamps.
    Returns a dictionary of metrics for the general analysis flow.
@@ -258,7 +258,7 @@ def average_event_rate(time_data, overflows):
    duration = np.max(times) - np.min(times)
    if duration <= 0:
       return np.nan
-   n = float(len(times))+overflows
+   n = float(len(times))
    return f"{n/duration:.2f} ± {float(np.sqrt(n))/duration:.2f}"
 
 def average_baseline(time_data, baseline_data, spike_threshold=5.0):

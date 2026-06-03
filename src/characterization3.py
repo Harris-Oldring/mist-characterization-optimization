@@ -46,7 +46,7 @@ polarity = 'positive' # Polarity of the signal, either 'positive' or 'negative'.
 
 
 class Characterize:
-   def __init__(self, n_channels, parent_dir, scope='both', general_analysis_names=['Number of Events', 'Sample Duration', 'Average Event Rate', 'Average Baseline'], fit_analysis_names=['LanGauss Height', 'Exponentially Modified Gaussian Energy'], fit_tests=['kolmogorov_smirnov', 'chi_squared_per_ndof'], save=None, mode='w', plots=None, log=None, clean_up=True):
+   def __init__(self, n_channels, parent_dir, scope='both', general_analysis_names=['Number of Events', 'Sample Duration', 'Average Event Rate', 'Average Baseline'], fit_analysis_names=['Langauss Height', 'Exponentially Modified Gaussian Energy'], fit_tests=['chi_squared_per_ndof'], save=None, mode='w', plots=None, log=None, clean_up=True):
       '''
       n_channels (int): Number of channels to analyze.
       parent_dir (str): Parent directory containing the RAW subdirectory with channel data files.
@@ -54,7 +54,7 @@ class Characterize:
          Note: 'individual' analyzes each channel separately, 'aggregate' combines all channels for analysis, and 'both' performs analysis on all channels individually and together.
       general_analysis_names (list of str): List of general analyses to perform (default: ['Number of Events', 'Sample Duration', 'Average Event Rate', 'Average Baseline']).
       fit_analysis_names (list of str): List of fit analyses to perform (default: ['Landau-Gaussian Height', 'Exponentially Modified Gaussian Energy']).
-      fit_tests (list of str): List of fit tests to perform, options include 'kolmogorov_smirnov', 'anderson_darling', 'chi_squared', 'chi_squared_per_ndof' (default: ['kolmogorov_smirnov', 'chi_squared_per_ndof']).
+      fit_tests (list of str): List of fit tests to perform, options include 'kolmogorov_smirnov', 'anderson_darling', 'chi_squared', 'chi_squared_per_ndof' (default: ['chi_squared_per_ndof']).
       plots (str or None): File path to save plots as a PDF, or None to not save plots (default: None).
       save (str or None): File path to save results as a CSV, or None to not save results (default: None).
          Note: If None, results will be printed to console instead of saved to file.
@@ -98,7 +98,7 @@ class Characterize:
             'description': 'Compute the average event rate from timestamp data.',
             'func': average_event_rate,
             'args': None,
-            'input_data': ['Time', 'Overflows'],
+            'input_data': ['Time'],
             'units': 'events/s',
             'plot': False
          },
@@ -300,6 +300,7 @@ class Characterize:
          self.logger.error(f"RAW subdirectory not found: {self.raw_dir}")
          raise FileNotFoundError(f"RAW subdirectory not found: {self.raw_dir}")
       self.data_type_opts = ["Height", "Baseline", "Energy", "Channel", "Time"]
+      self.data_type_overflow_opts = [False, False, True, False, False] # This indicates which data types have overflow events that need to be removed for fitting and general analyses.
 
       # Data saving setup
       self.fit_results_list = []
@@ -696,8 +697,8 @@ class Characterize:
                general_analysis_header.append(f"Channel {channel_idx}")
                overflows.append(channel_overflows)
                self.individual_channel_data['Overflows'].append(channel_overflows)
-               ### Apply mask to all data types for the channel
-               for data_type in self.data_type_opts:
+               ### Apply mask to all data types for the channel which need overflows removed
+               for data_type in np.array(self.data_type_opts)[self.data_type_overflow_opts]:
                   self.individual_channel_data[data_type][channel_idx] = np.array(self.individual_channel_data[data_type][channel_idx])[mask].tolist()
                
          elif scope == 'aggregate':
@@ -706,8 +707,8 @@ class Characterize:
                general_analysis_header.append(f"All Channels")
                overflows.append(channel_overflows)
                self.aggregate_data['Overflows'] = channel_overflows
-               ### Apply mask to all data types for the aggregate data
-               for data_type in self.data_type_opts:
+               ### Apply mask to all data types for the aggregate data which need overflows removed
+               for data_type in np.array(self.data_type_opts)[self.data_type_overflow_opts]:
                   self.aggregate_data[data_type] = np.array(self.aggregate_data[data_type])[mask].tolist()
          
          # Perform all fit analyses for each specified data type and compile results into self.fit_results_list for saving or display.
@@ -846,8 +847,8 @@ def main():
    parser.add_argument('n_channels', type=int, help="Number of channels to analyze.")
    parser.add_argument('--scope', type=str, choices=['individual', 'aggregate', 'both'], default='both', help="Scope of analysis: 'individual', 'aggregate', or 'both' (default: 'both').")
    parser.add_argument('--general_analyses', nargs='+', default=['Number of Events', 'Sample Duration', 'Average Event Rate', 'Average Baseline'], help="List of general analyses to perform by name (default: ['Number of Events', 'Sample Duration', 'Average Event Rate', 'Average Baseline']).")
-   parser.add_argument('--fit_analyses', nargs='+', default=['LanGauss Height', 'Exponentially Modified Gaussian Energy'], help="List of fit analyses to perform by name (default: ['LanGauss Height', 'Exponentially Modified Gaussian Energy']).")
-   parser.add_argument('--fit_tests', nargs='+', choices=['kolmogorov_smirnov', 'anderson_darling', 'chi_squared', 'chi_squared_per_ndof'], default=['kolmogorov_smirnov', 'chi_squared_per_ndof'], help="List of fit tests to perform (default: ['kolmogorov_smirnov', 'chi_squared_per_ndof']).")
+   parser.add_argument('--fit_analyses', nargs='+', default=['Langauss Height', 'Exponentially Modified Gaussian Energy'], help="List of fit analyses to perform by name (default: ['Langauss Height', 'Exponentially Modified Gaussian Energy']).")
+   parser.add_argument('--fit_tests', nargs='+', choices=['kolmogorov_smirnov', 'anderson_darling', 'chi_squared', 'chi_squared_per_ndof'], default=['chi_squared_per_ndof'], help="List of fit tests to perform (default: ['chi_squared_per_ndof']).")
    parser.add_argument('--save', type=str, default=None, help="File path to save results as a CSV, or None to not save results (default: None).")
    parser.add_argument('--mode', type=str, choices=['w', 'a'], default='w', help="File mode for saving results: 'w' for write (overwrite) or 'a' for append (default: 'w').")
    parser.add_argument('--plots', type=str, default=None, help="File path to save plots as a PDF. If plots and save is specified, plots are saved to the specified PDF file. If plots is specified but save is None, plots are displayed, but not saved to a file. Currently no support for appending to pdf. (default: None).")
