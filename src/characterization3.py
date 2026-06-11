@@ -596,7 +596,7 @@ class Characterize:
             subset.to_excel(writer, sheet_name=data_type, index=False)
             
       message = f"Successfully created {output_excel} with sheets: {list(df['Analysis'].unique())}"
-      print(message)
+      # print(message)
       self.logger.info(message)
 
    def perform_fit_analysis(self, data, fit_analysis, scope, channel=None):
@@ -778,7 +778,7 @@ class Characterize:
          self.pdf_pages.close()
          if self.save:
             message = f"General analysis results table and fit plots saved to: {self.plots}"
-            print(f"\n{message}")
+            # print(f"\n{message}")
             self.logger.info(message)
       
       ## Save results to Excel if specified,
@@ -796,16 +796,16 @@ class Characterize:
                   writer.writeheader()
                writer.writerows(self.fit_results_list)
             message = f"Fit analysis results saved to: {self.save}"
-            print(message)
+            # print(message)
             self.logger.info(message)
 
             self.reformat_to_excel()
-            print(message)
+            # print(message)
             self.logger.info(message)
             excel_mode = 'a'
          else:
             message = "No fit analysis results to save."
-            print(message)
+            # print(message)
             self.logger.warning(message)
             excel_mode = 'w'
       
@@ -823,17 +823,17 @@ class Characterize:
 
             if self.mode=='a':
                general_results_df = pd.concat([copy_df,general_results_df],axis=0)
-            print(general_results_df)
+            # print(general_results_df)
 
             with pd.ExcelWriter(output_excel, engine='openpyxl', mode=excel_mode) as writer:
                general_results_df.to_excel(writer, sheet_name='General', index=False)
 
             message = f"General analysis results saved to 'General' sheet in {output_excel}"
-            print(message)
+            # print(message)
             self.logger.info(message)
          else:
             message = "No general analysis results to save."
-            print(message)
+            # print(message)
             self.logger.warning(message)
 
       # Clean up if specified

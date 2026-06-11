@@ -84,44 +84,65 @@ echo "======================================================"
 echo ""
 
 # Loop from START (inclusive) to STOP (exclusive)
-for (( n=START; n<STOP; n++ )); do
-   PARENT_DIR="${TARGET_DIR}/test_${n}"
-   RAW_DIR="${PARENT_DIR}/RAW"
-    
-   ## Check if the RAW directory exists
-   if [ ! -d "$RAW_DIR" ]; then
-      echo "Warning: Directory '$RAW_DIR' does not exist. Skipping test_${n}."
-      continue
-   fi
-    
-   ## Determine n_channels by counting files containing 'CH'
-   ### 'find' is used here to safely count files only (ignoring subdirectories) even if names have spaces
-   N_CHANNELS=$(find "$RAW_DIR" -maxdepth 1 -type f -name "*CH*" | wc -l)
-    
-   ## Check for zero channels
-   if [ "$N_CHANNELS" -eq 0 ]; then
-      echo "Warning: No files containing 'CH' found in '$RAW_DIR'. Skipping test_${n}."
-      continue
-   fi
-    
-   ## Execute the Python script
-   echo "Processing test_${n} with ${N_CHANNELS} channels..."
-   if [ $n -eq $START ]; then
-      # echo "Write mode" # DEBUG
-      python3 "$PY_SCRIPT" "$PARENT_DIR" "$N_CHANNELS" --save "$SUMMARY_FILE" --mode w --no_clean_up
-   elif [ $n -eq $END ]; then
-      # echo "Append mode with clean up for last test" # DEBUG
-      python3 "$PY_SCRIPT" "$PARENT_DIR" "$N_CHANNELS" --save "$SUMMARY_FILE" --mode a 
-   else
-      # echo "Append mode with no clean up for intermediate tests" # DEBUG
-      python3 "$PY_SCRIPT" "$PARENT_DIR" "$N_CHANNELS" --save "$SUMMARY_FILE" --mode a --no_clean_up 
-   fi
-    
-   ## Check if the python script failed and warn the user
-   if [ $? -ne 0 ]; then
-      echo "Warning: characterization3.py returned an error for test_${n}."
-   fi
-done
+python3 - <<EOF
+import subprocess
+import sys
+from tqdm import tqdm
+import glob
+
+TARGET_DIR = "$TARGET_DIR"
+START = $START
+STOP = $STOP
+END = $END
+PY_SCRIPT = "$PY_SCRIPT"
+SUMMARY_FILE = "$SUMMARY_FILE"
+
+for n in tqdm(range(START, STOP), desc="Processing tests", unit="test"):
+    parent_dir = f"{TARGET_DIR}/test_{n}"
+    raw_dir = f"{parent_dir}/RAW"
+
+    # check existence via subprocess-safe method
+    import os
+    if not os.path.isdir(raw_dir):
+        tqdm.write(f"Skipping test_{n} (missing RAW dir)")
+        continue
+
+    channels = glob.glob(f"{raw_dir}/*CH*")
+    n_channels = len(channels)
+
+    if n_channels == 0:
+        tqdm.write(f"Skipping test_{n} (no channels)")
+        continue
+
+   #  tqdm.write(f"Running test_{n} with {n_channels} channels")
+
+    if n == START:
+        mode = "w"
+        extra = ["--no_clean_up"]
+    elif n == END:
+        mode = "a"
+        extra = []
+    else:
+        mode = "a"
+        extra = ["--no_clean_up"]
+
+    cmd = [
+        "python3",
+        PY_SCRIPT,
+        parent_dir,
+        str(n_channels),
+        "--save",
+        SUMMARY_FILE,
+        "--mode",
+        mode,
+        *extra
+    ]
+
+    result = subprocess.run(cmd)
+
+    if result.returncode != 0:
+        tqdm.write(f"Warning: characterization3.py failed for test_{n}")
+EOF
 
 echo ""
 echo "======================================================"

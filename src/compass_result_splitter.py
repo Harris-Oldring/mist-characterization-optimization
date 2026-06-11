@@ -2,6 +2,7 @@ import argparse
 import numpy as np
 import uproot
 from pathlib import Path
+from tqdm import tqdm
 
 
 class CompassResultSplitter:
@@ -101,11 +102,15 @@ class CompassResultSplitter:
         chunk_counts = []
 
         for ch_id, filepath in channel_files.items():
-            with uproot.open(f"{filepath}:{self.tree_name}") as tree:
+            rootfile = uproot.open(filepath)
+            with rootfile[rootfile.keys(filter_classname="TTree")[0]] as tree:
+                # print(f"[DEBUG] ",rootfile.keys(filter_classname="TTree"))
+
                 num_entries = tree.num_entries
                 if num_entries == 0:
                     chunk_counts.append(0)
                     continue
+                # print(f"[DEBUG] num_entries = {num_entries}")
 
                 start_time = tree[self.timestamp_branch].array(
                     library="np", entry_start=0, entry_stop=1
@@ -120,50 +125,79 @@ class CompassResultSplitter:
                 while curr < end_time:
                     chunks += 1
                     curr += self.chunk_duration
+                # print(f"[DEBUG] Channel {ch_id} has {chunks} chunks available")
+                # print(f"[DEBUG] Channel {ch_id} duration is {start_time/1e12:.2f} to {end_time/1e12:.2f}")
 
                 chunk_counts.append(chunks)
 
         # Use the minimum across channels so every chunk is present in every channel.
+        # print(f"[DEBUG] Using {min(chunk_counts)} chunks available")
         return min(chunk_counts) if chunk_counts else 0
 
     def _split_channel(self, filepath: Path, chunk_dirs: list, num_chunks: int):
         """Write each channel file into time-aligned chunk files based on the timestamp branch."""
-        with uproot.open(f"{filepath}:{self.tree_name}") as tree:
+
+        rootfile = uproot.open(filepath)
+        with rootfile[rootfile.keys(filter_classname="TTree")[0]] as tree:
             timestamps = tree[self.timestamp_branch].array(library="np")
             total_entries = len(timestamps)
 
-            current_start_time = timestamps[0]
+            start_time = timestamps[0]
+            end_time = timestamps[-1]
+            total_duration = (end_time - start_time) / self.time_unit_factor
 
-            for i in range(num_chunks):
+            # ---- Header info (printed once, above progress bar) ----
+            print("\n" + "=" * 70)
+            print(f"Processing file: {filepath.name}")
+            print(f"Total entries   : {total_entries}")
+            print(f"Run duration    : {total_duration:.2f} s")
+            print(f"Num chunks      : {num_chunks}")
+            print("=" * 70 + "\n")
+
+            current_start_time = start_time
+
+            # ---- Progress bar over chunks ----
+            for i in tqdm(range(num_chunks), desc="Splitting channel", unit="chunk"):
                 current_end_time = current_start_time + self.chunk_duration
 
-                start_entry = np.searchsorted(timestamps, current_start_time, side="left")
-                stop_entry = np.searchsorted(timestamps, current_end_time, side="right")
-                stop_entry = min(stop_entry, total_entries)
+                start_entry = np.searchsorted(
+                    timestamps,
+                    current_start_time,
+                    side="left"
+                )
 
-                out_filename = chunk_dirs[i] / filepath.name
+                stop_entry = np.searchsorted(
+                    timestamps,
+                    current_end_time,
+                    side="right"
+                )
+
+                stop_entry = min(stop_entry, total_entries)
 
                 if start_entry == stop_entry:
                     current_start_time = current_end_time
                     continue
 
-                print(
-                    f"  -> Chunk {i}: Entries "
-                    f"[{start_entry} to {stop_entry}] "
-                    f"to {chunk_dirs[i].parent.name}/RAW/{filepath.name}"
-                )
+                out_filename = chunk_dirs[i] / filepath.name
 
-                # Read the selected entries from the tree. Uproot defaults to awkward arrays,
-                # which handle variable-length waveforms correctly.
+                # Keep tqdm clean: avoid cluttering per iteration unless needed
+                # tqdm.write(
+                #     f"Chunk {i}: entries [{start_entry}, {stop_entry}) "
+                #     f"-> {chunk_dirs[i].parent.name}/RAW/{filepath.name}"
+                # )
+
+                branches = tree.keys()
                 chunk_data = tree.arrays(
+                    branches,
                     entry_start=start_entry,
                     entry_stop=stop_entry
                 )
 
-                # Convert the awkward record array to a simple dict so the output ROOT tree can be created cleanly.
-                tree_dict = {field: chunk_data[field] for field in chunk_data.fields}
+                tree_dict = {
+                    field: chunk_data[field]
+                    for field in chunk_data.fields
+                }
 
-                # Strip cycle suffixes from the tree name for the output file.
                 clean_tree_name = self.tree_name.split(";")[0]
 
                 with uproot.recreate(out_filename) as out_file:

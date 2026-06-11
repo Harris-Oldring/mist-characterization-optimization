@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.stats import norm, exponnorm, landau, kstest, anderson, anderson_ksamp, chisquare, gaussian_kde
+from scipy.stats import norm, exponnorm, landau, kstest, anderson, anderson_ksamp, chisquare, gaussian_kde, skew
 from scipy.interpolate import BarycentricInterpolator,interp1d,make_interp_spline
 from scipy.integrate import quad
 from scipy.optimize import curve_fit,root_scalar
@@ -374,10 +374,19 @@ def langauss_fit(data):
    half_bins, cdf = cdf_hist(n,bins)
 
    mu0,_,c0,_ = landau_fit(data)
-   p0 = [mu0, c0, 6*c0]  # mu, c, mean, std
+   p0 = [mu0, c0, 6*c0]  # landau mpv, landau width, 6x landau width
    popt, pcov = curve_fit(lambda x, landau_x_mpv, landau_xi, gauss_sigma: langauss.cdf(x, landau_x_mpv=landau_x_mpv, landau_xi=landau_xi, gauss_sigma=gauss_sigma), half_bins, cdf, p0=p0)
-
    landau_x_mpv, landau_xi, gauss_sigma = popt
+
+   retries = 0
+   while gauss_sigma < 0: # This is a good indicator for a poor fit
+      retries += 1
+      p0 = [landau_x_mpv, landau_xi/2, 25] # The most likely explanation of a bad fit is big initial guess for landau_xi
+      popt, pcov = curve_fit(lambda x, landau_x_mpv, landau_xi, gauss_sigma: langauss.cdf(x, landau_x_mpv=landau_x_mpv, landau_xi=landau_xi, gauss_sigma=gauss_sigma), half_bins, cdf, p0=p0)
+      landau_x_mpv, landau_xi, gauss_sigma = popt
+      if retries > 5:
+         raise RuntimeError(f"Distribution cannot be fit. {retries+1} attempts made.")
+
    sigma_landau_x_mpv,sigma_landau_xi,sigma_gauss_sigma=np.sqrt(np.diag(pcov))
    return landau_x_mpv, sigma_landau_x_mpv, landau_xi, sigma_landau_xi, gauss_sigma, sigma_gauss_sigma
 
@@ -443,7 +452,9 @@ def exp_mod_gauss_fit(data):
    '''
    n,bins = np.histogram(data,bins=int(np.sqrt(len(data))),density=True)
    half_bins = np.array([(bins[i]+bins[i+1])/2 for i in range(len(bins)-1)])
-   p0 = np.array([1,np.mean(data),np.std(data)])
+   m, s, g = np.mean(data),np.std(data),skew(data)
+   tau = s*np.cbrt(g/2)
+   p0 = np.array([tau/np.sqrt(s**2-tau**2),m-tau,np.sqrt(s**2-tau**2)]) # See https://en.wikipedia.org/wiki/Exponentially_modified_Gaussian_distribution
    popt, pcov = curve_fit(lambda x, K, mean, std: exponnorm.pdf(x, K, mean,std), half_bins, n,p0=p0)
    K,mean,std = popt
    sigma_K,sigma_mean,sigma_std=np.sqrt(np.diag(pcov))
