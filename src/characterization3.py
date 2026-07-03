@@ -402,7 +402,7 @@ class Characterize:
       ## PDF Fit plot
       ax1.set_title(f"{fit_analysis['title']} ({scope})")
       ax1.set_xlabel(xlabel)
-      ax1.set_ylabel("Frequency")
+      ax1.set_ylabel("Probability Density")
       ax1.hist(data, bins=round(np.sqrt(len(data))), density=True,histtype="step")
       ax1.plot(xfit, yfit, label=f'{fit_type} PDF Fit')
       ax1.legend()
@@ -411,7 +411,7 @@ class Characterize:
       y_cdf = pdf2cdf(xfit, yfit)
       ax2.set_title(f"{fit_analysis['title']} ({scope})")
       ax2.set_xlabel(xlabel)
-      ax2.set_ylabel("Frequency")
+      ax2.set_ylabel("Probability")
       ax2.set_ylim(1e-4,1.1)
       ax2.hist(data, bins=round(np.sqrt(len(data))), density=True, cumulative=True, histtype="step")
       ax2.plot(xfit, y_cdf, label=f'{fit_type} CDF Fit')

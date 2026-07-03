@@ -1,12 +1,6 @@
 .DS_Store
 *.log
-assets/results/*
-assets/test_0_*
-assets/test_1_*
-assets/test_2_*
-assets/test_3_*
-assets/test_29_*
-assets/test_30_*
+data
 analysis/characterization_development/test_*
 analysis/characterization_development/Scenario_5_Revised_Run
 analysis/sample_duration/old_variance_results
