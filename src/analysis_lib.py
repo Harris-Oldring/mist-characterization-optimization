@@ -1,12 +1,13 @@
 import numpy as np
-from scipy.stats import norm, exponnorm, landau, kstest, anderson, anderson_ksamp, chisquare, gaussian_kde
+import matplotlib.pyplot as plt
+from scipy.stats import norm, exponnorm, landau, kstest, anderson, anderson_ksamp, chisquare, gaussian_kde, skew
 from scipy.interpolate import BarycentricInterpolator,interp1d,make_interp_spline
 from scipy.integrate import quad
 from scipy.optimize import curve_fit,root_scalar
-#from landaupy import langauss
+from landaupy import langauss
 
-
-#UTILITY
+# FUNCTIONS
+## UTILITY
 def cdf_hist(n, bins):
    '''
    returns half_bins, cdf, the x and y data that makes up your discrete cdf
@@ -27,17 +28,18 @@ def pdf2cdf(x,y_pdf):
    y_cdf[1:] = np.cumsum((y_pdf[:-1] + y_pdf[1:]) / 2 * dx)
    return y_cdf / y_cdf[-1]
 
-# FIT FUNCTIONS
+
+## FIT FUNCTIONS
 def gauss_fit(data):
    '''
    Given a set of data, fits a Gauss distribution
    Returns:
-   mean,sigma_mean,std,sigma_std - The fit parameters mu,c as well as an estimate of their error
+   popt - The fit parameters mu,sigma
+   sigma_popts - The error in mu and sigma obtained through curve_fit
    '''
-   print("Fitting Gaussian...")
    n,bins = np.histogram(data,bins=int(np.sqrt(len(data))),density=True)
    half_bins, cdf = cdf_hist(n,bins)
-   print(np.mean(data),np.std(data))
+
    popt, pcov = curve_fit(lambda x, mu, c: norm.pdf(x, loc=mu, scale=c), half_bins, n,p0=[np.mean(data), np.std(data)])
    sigma_popts=np.sqrt(np.diag(pcov))
    return popt,sigma_popts
@@ -46,74 +48,83 @@ def landau_fit(data):
    '''
    Given a set of data, fits a Landau distribution
    Returns:
-   mu,sigma_mu,c,sigma_c - The fit parameters mu,c as well as an estimate of their error
+   popt - The fit parameters mu and c
+   sigma_popts - The error in mu and c obtained through curve_fit
    '''
    n,bins = np.histogram(data, bins=int(np.sqrt(len(data))))
    half_bins, cdf = cdf_hist(n,bins)
+
    popt, pcov = curve_fit(lambda x, mu, c: landau.cdf(x, loc=mu, scale=c), half_bins, cdf)
    sigma_popts=np.sqrt(np.diag(pcov))
    return popt,sigma_popts
 
-# def langauss_fit(data):
-#    '''
-#    Given a set of data, fits a Langauss distribution
-#    Returns:
-#    landau_x_mpv, landau_xi, gauss_sigma - The fit parameters as well as an estimate of their error
-#    '''
-#    n,bins = np.histogram(data, bins=int(np.sqrt(len(data))))
-#    half_bins, cdf = cdf_hist(n,bins)
-
-#    mu0, c0 = landau_fit(data)[0]
-#    p0 = [mu0, c0, 6*c0]  # mu, c, mean, std
-#    popt, pcov = curve_fit(lambda x, landau_x_mpv, landau_xi, gauss_sigma: langauss.cdf(x, landau_x_mpv=landau_x_mpv, landau_xi=landau_xi, gauss_sigma=gauss_sigma), half_bins, cdf, p0=p0)
-#    sigma_popts=np.sqrt(np.diag(pcov))
-#    return popt,sigma_popts
-
-def landau_star_gauss_fit(data,mu_l=1,mu_u=500,c_l=1,c_u=200,x0_l=1,x0_u=500,std_l=0.01,std_u=150, fast=False):
+def langauss_fit(data):
    '''
-   Given a set of data, fits a Landau distribution convoluted with a Gaussian distribution
+   Given a set of data, fits a Langauss distribution
    Returns:
-   mu,sigma_mu,c,sigma_c,mean,sigma_mean,std,sigma_std - The fit parameters mu,c,mean,std as well as an estimate of their error
+   popt - The fit parameters x_mpv, xi, and Gaussian sigma
+   sigma_popts - The error in x_mpv, xi, and Gaussian sigma obtained through curve_fit
    '''
-   l,u = min(data),max(data)
    n,bins = np.histogram(data, bins=int(np.sqrt(len(data))))
    half_bins, cdf = cdf_hist(n,bins)
 
-   mu0,c0 = landau_fit(data)[0]
-   x00, std0 = np.mean(half_bins), np.std(half_bins)/2
+   mu0,_,c0,_ = landau_fit(data)
+   p0 = [mu0, c0, 6*c0]  # landau mpv, landau width, 6x landau width
+   popt, pcov = curve_fit(
+      lambda x, landau_x_mpv, landau_xi, gauss_sigma: langauss.cdf(x, landau_x_mpv=landau_x_mpv, landau_xi=landau_xi, gauss_sigma=gauss_sigma), 
+      half_bins, 
+      cdf, 
+      p0=p0,
+      bounds=([-np.inf, 1e-6, -np.inf], [np.inf, np.inf, np.inf]) # Constrain xi and sigma to be > 0
+   )
+   landau_x_mpv, landau_xi, gauss_sigma = popt
 
-   # Fit with bounds to prevent negative sigma
-   bounds = ([mu_l, c_l, min(np.min(half_bins),x0_l), std_l], [mu_u, c_u, max(np.max(half_bins),x0_u), std_u])
-   if mu0>mu_u or mu0<mu_l: mu0=(mu_l+mu_u)/2
-   if c0>c_u or c0<c_l: c0=(c_l+c_u)/2
-   if x00>x0_u or x00<x0_l: x00=(x0_l+x0_u)/2
-   if std0>mu_u or std0<std_l: std0=(std_l+std_u)/2
+   retries = 0
+   while gauss_sigma < 0: # This is a good indicator for a poor fit
+      retries += 1
+      p0 = [landau_x_mpv, landau_xi/2, 25] # The most likely explanation of a bad fit is big initial guess for landau_xi
+      popt, pcov = curve_fit(
+         lambda x, landau_x_mpv, landau_xi, gauss_sigma: langauss.cdf(x, landau_x_mpv=landau_x_mpv, landau_xi=landau_xi, gauss_sigma=gauss_sigma), 
+         half_bins, 
+         cdf, 
+         p0=p0,
+         bounds=([-np.inf, 1e-6, -np.inf], [np.inf, np.inf, np.inf]) # Constrain xi to be > 0
+      )
+      landau_x_mpv, landau_xi, gauss_sigma = popt
+      if retries > 5:
+         raise RuntimeError(f"Distribution cannot be fit. {retries+1} attempts made.")
 
-   # Initial guesses: based on prior Landau fit and data estimates
-   p0 = [mu0, c0, x00, std0]  # mu, c, mean, std
-   lsg = landau_star_gauss_fastest if fast else landau_star_gauss
-   popt, pcov = curve_fit(lambda x, mu, c,x0, sigma: lsg(mu, c, x0, sigma,l,u,cdf=True)(x),
-                       half_bins, cdf, p0=p0, bounds=bounds)
-   
    sigma_popts=np.sqrt(np.diag(pcov))
-   return popt,sigma_popts
+   return popt, sigma_popts
 
 def exp_mod_gauss_fit(data):
    '''
    Given a set of data, fits an exponentially modified Gaussian distribution
    Returns:
-   K,sigma_K,mean,sigma_mean,std,sigma_std - The fit parameters mu,c as well as an estimate of their error
+   popt - The fit parameters K, mu, and sigma
+   sigma_popts - The error in K, mu, and sigma obtained through curve_fit
    '''
    n,bins = np.histogram(data,bins=int(np.sqrt(len(data))),density=True)
    half_bins = np.array([(bins[i]+bins[i+1])/2 for i in range(len(bins)-1)])
-   p0 = np.array([1,np.mean(data),np.std(data)])
-   popt, pcov = curve_fit(lambda x, K, mean, std: exponnorm.pdf(x, K, mean,std), half_bins, n,p0=p0)
-   K,mean,std = popt
-   sigma_K,sigma_mean,sigma_std=np.sqrt(np.diag(pcov))
-   return K,sigma_K,mean,sigma_mean,std,sigma_std
 
-# FIT TESTING
-def kolmogorov_smirnov(data, fit_cdf,n_params=None):
+   m, s, g = np.mean(data), np.std(data), skew(data)
+   while g<=0.5:
+      g*=2
+   tau = s * np.cbrt(g/2)  
+   variance_diff = s**2 - tau**2
+   if variance_diff > 0 and tau > 0:
+      p0 = np.array([tau / np.sqrt(variance_diff), m - tau, np.sqrt(variance_diff)]) # See https://en.wikipedia.org/wiki/Exponentially_modified_Gaussian_distribution
+   else:
+      # Fallback to a generic, safe initial guess if moments produce invalid math
+      p0 = np.array([1.0, m, s]) 
+
+   popt, pcov = curve_fit(lambda x, K, mean, std: exponnorm.pdf(x, K, mean,std), half_bins, n,p0=p0)
+   sigma_popts=np.sqrt(np.diag(pcov))
+   return popt,sigma_popts
+
+
+##FIT TESTING
+def kolmogorov_smirnov(data, fit_cdf, n_params):
    '''
    Performs a Kolmogorov-Smirnov test to compare the empirical distribution of the data with the fitted distribution.
    Returns the KS statistic and p-value.
@@ -121,20 +132,7 @@ def kolmogorov_smirnov(data, fit_cdf,n_params=None):
    ret = kstest(data, lambda x: fit_cdf(x))
    return ret.statistic, ret.pvalue
 
-# anderson_darling does not seem to be working properly, likely due to the fact that anderson is 
-# designed for testing against specific distributions rather than arbitrary fitted CDFs and 
-# anderson_ksamp is designed for testing whether two samples come from the same distribution rather
-#  than testing a sample against a fitted CDF. 
-def anderson_darling(data, fit_cdf,n_params=None):
-   '''
-   Performs an Anderson-Darling test to compare the empirical distribution of the data with the fitted distribution.
-   Returns the AD statistic and critical values.
-   '''
-   ret = anderson_ksamp([data, fit_cdf(np.sort(data))])
-   # ret = anderson(data, dist=lambda x: fit_cdf(x)) # Does not work because dist must be one of the predefined distributions in scipy
-   return ret.statistic, ret.pvalue
-
-def chi_squared(data, fit_cdf, n_params,per_ndof=False):
+def chi_squared(data, fit_cdf, n_params, per_ndof=False):
    '''
    Performs a Chi-Squared test to compare the empirical distribution of the data with the fitted distribution.
    Returns the Chi-Squared statistic and p-value.
@@ -159,17 +157,56 @@ def chi_squared(data, fit_cdf, n_params,per_ndof=False):
 
    return chi2, ret.pvalue
 
-def get_thresh(x,y_cdf,rate=1e-3):
-   interp = make_interp_spline(x,y_cdf,5)
-   return root_scalar(lambda t:interp(t)-rate,bracket=(min(x),max(x))).root
 
-lib={'Landau':{
-    'fit_func':landau_fit,
-    'pdf_func':lambda x, params: landau.pdf(x, loc=params[0], scale=params[1])}
+
+# ANALYSIS CONFIG
+
+'''
+HOW TO CONFIGURE FIT ANALYSES:
+------------------------------
+Each fit analysis is given as a dictionary containing the following keys:
+data_type: The type of data being analyzed (e.g., 'Height', 'Energy', 'Time').
+fit_func: The function used to fit the data (e.g., landau_fit, exp_mod_gauss_fit, gauss_fit).
+pdf_func: A lambda function that takes x and the fit parameters and returns the corresponding PDF values, used for plotting and fit tests.
+params: A list of the parameters of the fit function in the order they are stored
+threshold: A float representing the threshold to be calculated and plotted based on the fitted CDF, or None if no threshold is to be calculated (e.g., 0.001 for a 0.1% threshold).
+------------------------------
+'''
+fit_lib = {
+   'Landau': {
+      'data_type': 'Height',   
+      'fit_func': landau_fit,
+      'pdf_func': lambda x, params: landau.pdf(x, *params),
+      'params': ['mu', 'c'],
+      'threshold' : 0.001,
+   },
+   'Langauss' : {
+      'data_type': 'Height',
+      'fit_func': langauss_fit,
+      'pdf_func': lambda x, params: langauss.pdf(x, *params),
+      'params': ['x_mpv', 'xi', 'gauss_sigma'],
+      'threshold' : 0.001,
+   },
+   'EMG' : {
+      'data_type': 'Energy',
+      'fit_func': exp_mod_gauss_fit,
+      'pdf_func': lambda x, params: exponnorm.pdf(x, *params),
+      'param_names': ['K', 'mu', 'sigma'],
+      'threshold' : None
+   },
 }
 
-
-
-   #  'Langauss':{
-   #  'fit_func':langauss_fit,
-   #  'pdf_func':lambda x, params: langauss.pdf(x, landau_x_mpv=params[0], landau_xi=params[2], gauss_sigma=params[4])}
+fit_test_lib = {
+   'KS': {
+      'func': kolmogorov_smirnov,
+      'args': None,
+   },
+   'chi2': {
+      'func': chi_squared,
+      'args': False,
+   },
+   'chi2/ndof': {
+      'func': chi_squared,
+      'args': True,
+   },
+}

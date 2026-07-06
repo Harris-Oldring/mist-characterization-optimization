@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import numpy as np
 
 # def analysis(data,func_name):
 #     params,_ =al.lib[func_name]['fit_func'](data)
@@ -27,9 +28,24 @@ import matplotlib.pyplot as plt
 #     self.pdf_pages.savefig(fig)
 #     plt.close(fig)
 
+dtype_plot_config = {
+    'Height': {
+        'title': 'Distribution of Waveform Peaks',
+        'xlabel': 'Wavelength Peak',
+        'units': 'mV',
+    },
+    'Energy': {
+        'title': 'Energy Spectrum',
+        'xlabel': 'ADC [Channel]',
+        'units': '',
+    }
+}
+
 def plot_hist_with_fit(self, results, usrconfig, summary_text=None):
     '''
     Plots a histogram with a fitted probability density function.
+    TODO: Update this function
+    threshold = plot_hist_with_fit(data, x, y, ana['data_type'], result_row['Channel'], summary_text=summary_text)
     '''
     data=results.data
     xfit=results.xfit

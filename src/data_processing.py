@@ -4,12 +4,13 @@ import numpy as np
 
 class Data:
     def __init__(self):
-        self.db=dict()
-        self.NEvents=0
-        self.branches=[]
-        self.fnames=[]
-        self.duration=0
-        self.channel=-1
+        self.db = dict()
+        self.NEvents = 0
+        self.branches = []
+        self.fnames = []
+        self.duration = 0
+        self.channel = set()
+        self.event_rate = 0
 
     def __add__(self,other):
         if type(other)!=type(self):
@@ -23,10 +24,34 @@ class Data:
             sorted_indices = np.argsort(newdata.db['time'])
             for dtype in newdata.db.keys():
                 newdata.db[dtype]=newdata.db[dtype][sorted_indices]
+
+            newdata.NEvents = self.NEvents + other.NEvents
+            newdata.duration = self.duration + other.duration
+            newdata.channel = self.channel | other.channel
+            newdata.event_rate = newdata.compute_event_rate()
+
             return newdata
-            
+        
+    def __mod__(self, other):
+        if not isinstance(other, (list, np.ndarray)):
+            raise TypeError()
+        elif len(other) != len(self.db.keys()[0]):
+            raise IndexError(f"The length of the mask provided ({len(other)}) does not match the length of the data (({len(self.db.keys()[0])}))")
+        else:
+            newdata=Data()
+            for dtype in self.db.keys():
+                newdata.db[dtype]=self.db[dtype][other]
+            sorted_indices = np.argsort(newdata.db['time'])
+            for dtype in newdata.db.keys():
+                newdata.db[dtype]=newdata.db[dtype][sorted_indices]
 
+            t_arr = newdata.db["Time"]
+            newdata.NEvents = len(t_arr)
+            newdata.duration = t_arr[-1] - t_arr[0]
+            newdata.event_rate = newdata.compute_event_rate()
 
+            return newdata
+    
     def load_file(self,fname,n_max=None,mask_overflow=True):
         '''
         Given the name of a root file, return np arrays with relevant data.
@@ -66,24 +91,11 @@ class Data:
         self.db['Energy']=np.array(tree["Energy"].array(entry_stop=self.NEvents, library="np"))[sorted_indices]
         self.db['Channel']=np.array(tree["Channel"].array(entry_stop=self.NEvents, library="np"))[sorted_indices]
         self.duration= time[-1]-time[0]       
-        self.channel=self.db['Channel'][0]
+        self.channel.add(self.db['Channel'][0])
+        self.event_rate = self.compute_event_rate()
         if mask_overflow: self.mask_overflow()
-    
-    def mask_overflow(self,convert=False):
-        '''
-        Identifies overflow events based on the energy data and removes them from the target data, since overflow data turns up as
-        energies where the energy is at its maximum representable value (2^N - 1).
-        Returns a mask that can be applied to the data to remove overflow events and the number of overflow events identified.
-        '''
-        max_val = (max(self.db['energy']) + OFFSET)/LSB if convert else max(self.db['energy'])
-        mask=self.db['energy']!=max_val if np.log2(max_val+1).is_integer() else np.ones_like(self.db['energy'], dtype=bool)
-        Noverflow=len(mask)-np.sum(mask)
 
-        print(f"{Noverflow} overflow events found. This was {100*Noverflow/len(mask)}% of events.")
-
-        for k in self.db.keys(): self.db[k]=self.db[k][mask].tolist()
-
-    def average_event_rate(self):
+    def compute_event_rate(self):
         '''
         Calculate the average event rate for the provided timestamps.
         Returns a dictionary of metrics for the general analysis flow.
@@ -97,10 +109,23 @@ class Data:
         n = float(len(times))
         return f"{n/duration:.2f} ± {float(np.sqrt(n))/duration:.2f}"
 
+    def get_overflow_mask(self,convert=False):
+        '''
+        Identifies overflow events based on the energy data and removes them from the target data, since overflow data turns up as
+        energies where the energy is at its maximum representable value (2^N - 1).
+        Returns a mask that can be applied to the data to remove overflow events and the number of overflow events identified.
+        '''
+        max_val = (max(self.db['energy']) + OFFSET)/LSB if convert else max(self.db['energy'])
+        mask=self.db['energy']!=max_val if np.log2(max_val+1).is_integer() else np.ones_like(self.db['energy'], dtype=bool)
+        Noverflow=len(mask)-np.sum(mask)
+
+        print(f"{Noverflow} overflow events found. This was {100*Noverflow/len(mask)}% of events.")
+
+        return mask
+
     def average_generic(self, data_type):
         '''
-        Compute a simple baseline stability metric and count baseline spikes.
-        Returns x, y values to plot.
+        Computes the average and standard deviation of a 
         '''
         time_data=self.db['time']
         target_data=self.db[data_type]
@@ -113,9 +138,5 @@ class Data:
         if time_data.size < 2 or target_data.size < 2 or time_data.size != target_data.size:
             return {'Baseline Stability': np.nan, 'Baseline Spike Count': np.nan}, None
 
-        sort_idx = np.argsort(time_data)
-        t = time_data[sort_idx]
-        tar_sorted = target_data[sort_idx] #originally "sorted" - BAD - dont use existing system methods for names!!!
-
-        return t, tar_sorted
+        return f'{np.mean(target_data):.2f} ± {np.std(target_data):.2f}'
 
