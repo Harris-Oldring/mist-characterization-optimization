@@ -9,7 +9,7 @@ class Data:
         self.branches = []
         self.fnames = []
         self.duration = 0
-        self.channel = set()
+        self.channel = -1
         self.event_rate = 0
 
     def __add__(self,other):
@@ -27,7 +27,6 @@ class Data:
 
             newdata.NEvents = self.NEvents + other.NEvents
             newdata.duration = self.duration + other.duration
-            newdata.channel = self.channel | other.channel
             newdata.event_rate = newdata.compute_event_rate()
 
             return newdata
