@@ -61,15 +61,15 @@ def main():
             logger = None
 
     # Validation and Error Handling
-    check_arg(Path(args.parent_dir).is_dir(), ValueError, logger, errtext=f"Parent directory does not exist: {args.parent_dir}")
+    check_arg(Path(parent_dir).is_dir(), ValueError, logger, errtext=f"Parent directory does not exist: {parent_dir}")
 
-    # for i_ana in args.analyses:
-    #     check_arg(i_ana in al.ana_lib.keys(), ValueError, logger, errtext=f"Analysis config does not exist: {args.analyses}") 
+    # for i_ana in analyses:
+    #     check_arg(i_ana in al.ana_lib.keys(), ValueError, logger, errtext=f"Analysis config does not exist: {analyses}") 
 
-    for i_fit in args.fits:
+    for i_fit in fits:
         check_arg(i_fit in al.fit_lib.keys(), ValueError, logger, errtext=f"Fit config does not exist: {i_fit}") 
 
-    for i_test in args.fit_tests:
+    for i_test in fit_tests:
         check_arg(i_test in al.fit_test_lib.keys(), ValueError, logger, errtext=f"Fit test config does not exist: {i_test}") 
         
     # Get names of all valid root files from pdir FNAME='DataR_CH0@DT5751_1616_test_14.root'
@@ -120,7 +120,7 @@ def main():
 
     ## Fitting Analysis
     results = {}
-    for fit in args.fit:
+    for fit in fit:
         fit_results = []
         data_type =  al.fit_lib[fit]['data_type']
         for dataset in data_to_analyze:
@@ -129,7 +129,7 @@ def main():
         results[fit] = fit_results
 
     # Save all the stuff to output folder if requested
-    sv.save(outfolder, args.parent_dir, base, results, logger)
+    sv.save(outfolder, parent_dir, base, results, logger)
 
 
 if __name__ == "__main__":
