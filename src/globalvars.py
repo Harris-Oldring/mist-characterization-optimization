@@ -1,5 +1,10 @@
-#LOCAL CONFIG
-PARENT_DIR=""
+from pathlib import Path
+
+EXAMPLES = [
+   [False, Path('data') / 'test_0', 3, 'Individual', ['Langauss', 'EMG'], ['chi2/ndof']],
+   [True, Path('data') / 'test_0', 3, 'Both', ['Langauss', 'EMG'], ['chi2/ndof']],
+   [True, Path('data') / 'test_66', 3, 'Both', ['Landau', 'Langauss', 'EMG'], ['KS', 'chi2', 'chi2/ndof']],
+]
 
 #DIGITIZER SETTINGS
 FSR=1000 # The full scale range of the digitizer in mV.

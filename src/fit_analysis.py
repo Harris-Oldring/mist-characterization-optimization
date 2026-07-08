@@ -204,7 +204,7 @@ class FitResult:
       
       # Include parameters and their errors
       param_dict = dict(zip(self.ana['params'], self.params))
-      param_err_dict = dict(zip(f'{self.ana['params']} Error', self.param_errs))
+      param_err_dict = dict(zip([f'{param} Error' for param in self.ana['params']], self.param_errs))
       self.result_row.update(param_dict)
       self.result_row.update(param_err_dict)
       

@@ -3,7 +3,7 @@ import logging
 import time
 from pathlib import Path
 
-from globalvars import PARENT_DIR
+from globalvars import EXAMPLES
 import data_processing as dp
 import analysis_lib as al
 import fit_analysis as fa
@@ -16,9 +16,10 @@ def check_arg(testbool, errtype, logger, errtext=None):
 
 def main():
     parser = argparse.ArgumentParser(description="Characterize data from multiple channels with various analyses and fit tests.")
-    parser.add_argument('-example','-e', help="Runs an example to test that the code runs and is installed correctly.",action="store_true")
     parser.add_argument('-save','-s', help="Saves results files instead of printing to terminal", action="store_false")
-    parser.add_argument('-parent_dir','-p', type=str, help="Parent directory containing RAW subdirectory with channel data files.",default=PARENT_DIR)
+    parser.add_argument('-example','-e', type = int, choices=[0,1,2], help="Runs an example to test that the code runs and is installed correctly.", default = -1)
+    # TODO: Update parent_dir (& EXAMPLES) default once I have assets structure
+    parser.add_argument('-parent_dir','-p', type=str, help="Parent directory containing RAW subdirectory with channel data files.",default='')
     parser.add_argument('-n_channels','-n', type=int, help="Number of channels to analyze. If empty, analyze all channels available.",default=None)
     parser.add_argument('-outfolder','-o', type=str, default=None, help="Folder name to send logging and results files, or None to not save results and disable logging (default: f'{parent_dir}_results').")
     parser.add_argument('-scope', type=str, choices=['Individual', 'Aggregate', 'Both'], default='Both', help="Scope of analysis: 'Individual', 'Aggregate', or 'Both' (default: 'Both').")
@@ -28,21 +29,22 @@ def main():
     parser.add_argument('-log', type=tuple, default=(), help="Tuple containing file path for logging output and logging level respectively (default: ()). NOTE: If name is dt, output is unix timestamp")
     args = parser.parse_args()
 
-    if args.example:
-        # Ignore everything else and use example data and preset settings
-        save, parent_dir, n_channels, scope = False, Path('data') / 'test_0', 3, 'Both'
+    # Initialization
+    if args.example in [0,1,2]:
+        ## Ignore everything else and use example data and preset settings
+        save, parent_dir, n_channels, scope, fits, fit_tests = EXAMPLES[args.example]
         outfolder = Path('characterization_example')
         outfolder.mkdir(parents=True, exist_ok=True)
-        fits, fit_tests = ['Langauss', 'EMG'], ['chi2/ndof']
         logger = logging.getLogger(__name__)
         logging.basicConfig(filename=outfolder / (str(int(time.time()))+'.log'), encoding='utf-8', level='INFO')
     else:
+        ## Use User Input
         parent_dir = args.parent_dir
-        outfolder = Path(args.outfile) if args.outfile else Path(f'{parent_dir}_results')
+        outfolder = Path(args.outfolder) if args.outfolder else Path(f'{parent_dir}_results')
         outfolder.mkdir(parents=True, exist_ok=True)
         n_channels, scope = args.n_channels, args.scope
         fits, fit_tests = args.fits, args.fit_tests
-        # Set up logging
+        ### Set up logging
         if len(args.log>0):
             if len(args.log)!=2: raise ValueError(f"--log argument must be tuple of length 0 or 2, not {len(args.log)}")
             if (not isinstance(args.log[0],str)) or (not isinstance(args.log[1],str)): raise ValueError(f"--log argument must be tuple of strings")
@@ -137,7 +139,7 @@ def main():
         results[fit] = fit_results
 
     # Save all the stuff to output folder if requested
-    sv.save_to_folder(outfolder, parent_dir.name, base, results, logger=logger)
+    if save: sv.save_to_folder(outfolder, parent_dir.name, base, results, logger=logger)
 
 
 if __name__ == "__main__":
