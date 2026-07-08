@@ -25,7 +25,7 @@ Here are the instructions and requirements for setting up mist-characterization-
    ```
 4. **Verify the installation**
    ```bash
-   python characterization3.py --help
+   python3 src/main.py --help
    ```
 5. **Manually update landaupy**
    Change lines 215 and 133 of landau.py and langauss.py, respectively, to replace `np.trapz` with `np.trapezoid` to avoid a warning about the deprecation of `np.trapz` for integration in favor of `np.trapezoid`.
