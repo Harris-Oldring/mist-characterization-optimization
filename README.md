@@ -31,96 +31,45 @@ Here are the instructions and requirements for setting up mist-characterization-
    Change lines 215 and 133 of landau.py and langauss.py, respectively, to replace `np.trapz` with `np.trapezoid` to avoid a warning about the deprecation of `np.trapz` for integration in favor of `np.trapezoid`.
 
 ## Overview of Repository Structure
- * `src` : Contains the analysis scripts
-    * `characterization3.py` : The main analysis script
-    * `batch_characterization3.sh` : A script to run `characterization3.py` on several run results at once
-    * `compass_result_splitter.py` : A script to break a given run result into several smaller run results of a given duration
-    * `batch_split_and_characterize` : Bare-bones script helpful to run `compass_result_splitter.py` and `batch_characterization3.sh` many times
+ * `src` : The characterization script and helper scripts
+    * `main.py` : The main analysis script
+    * `globalvars.py` : Several global variables that need to be declared based on the user's physical setup
+    * `save_lib.py` : Helper functions for saving results
+    * `fit_analysis.py` : A class which performs fit analyses on data, including fitting, fit tests, and plotting
+    * `data_processing.py` : A class which extracts and stores data from CoMPASS output files
+    * `analysis_lib.py` : Contains helper functions for analysis, as well as fit and fit-test configuration dictionaries
  * `analysis` : Contains several Jupyter notebooks, which were used to develop the analysis scripts
-    * `characterization_development.ipynb` : Development notebooks for the current version of `characterization3.py`
-       * `fitting_experimenting1.ipynb` : Was used to explore fitting techniques
-       * `fitting_experimenting2.ipynb` : Was used to explore fitting techniques, specifically binning
-       * `testing_fit_testing.ipynb` : Was used to explore fit tests
-    * `sample_duration.ipynb` : Used to explore how the sample duration of data affects the uncertainty of various analyses
-       * `varied_sample_durations1.ipynb` : Initial exploration of how the sample duration of data affects the uncertainty of fit parameters for the event rate analysis, which fits a LanGauss distribution to the histogram of event rates calculated from inter-event times
-       * `varied_sample_durations2.ipynb` : Further analysis of the same kind which is cleaner, clearer, and more robust
-       * `variance.ipynb` : Used to explore how our fit parameters and their uncertainties change between samples of the same duration
- * `data` : Sample data with descriptions
+    * `characterization_development` : Development notebooks for basic characterization techniques
+    * `sample_duration` : Used to explore how the sample duration of data affects the uncertainty of various analyses
+    * `daq_settings` : Used to explore how the DAQ settings of the CAEN DT5751 digitizer affect the waveform data
+    * `efficiency_map` : A study done into how the geometry of the MIST affects the efficiency of the detector
+ * `assets` : Sample data
+ * `batch_characterization.sh` : A script to perform batch characterization of several run results at once
+ * `batch_split_and_characterization.sh` : A bare-bones script to perform batch splitting and characterization of several run results at once
+ * `compass_result_splitter.py` : A script to split a CoMPASS run result into synchronized, fixed-duration chunks while preserving the original RAW folder and channel file structure
 
 ## Usage
-### `characterization3.py`
+### `src/main.py`
 This is the current characterization script, which allows you to perform analysis on data returned by the CAEN DT5751 digitizer using the CoMPASS software with "Acquisition/Save Raw Data" selected. This may be run from the terminal or used as a class. 
 
-#### Running `characterization3.py` in Terminal
-`characterization3.py` takes the following positional arguments:
- - `n_channels`: Number of channels to analyze.
- - `parent_dir`: Parent directory containing the RAW subdirectory with channel data files.
-Additional arguments can also be supplied to adjust how analysis is performed:\
- - To choose between performing analysis for each individual channel separately or for all channel data aggregated together, the `--scope` flag may be used with either 'individual', 'aggregate', or 'both' (default: 'both')
- - The `--general_analyses` flag is used to choose which non-fitting analyses you wish to perform. Before usage these must be configured (see [Configuring Your Analysis](#configuring-your-analysis)).\
-  (default: ['Number of Events', 'Sample Duration', 'Average Event Rate', 'Average Baseline'])
- - The `--fit_analyses` flag is used to choose which non-fitting analyses you wish to perform. Before usage these must be configured (see [Configuring Your Analysis](#configuring-your-analysis)).\
-  (default: ['Landau-Gaussian Height', 'Exponentially Modified Gaussian Energy'])
- - You can use the `--fit_tests` flag to choose which fit-tests you wish to use in conjunction with your fitting analysis. Before usage these must be configured (see [Configuring Your Analysis](#configuring-your-analysis)).\
-  (default: ['kolmogorov_smirnov', 'chi_squared_per_ndof'])
- - Results are either displayed in your terminal, or are saved to a .xlsx file (and potentially a .pdf file). To save results, provide the file name and path of your desired save location using `--save`
- - When saving to a file, you have the option between writing and appending to your provided location. This is specified via the `--mode` flag, by passing either 'w' or 'a'.\
-  (default: 'w')
- - If you wish to display plots generated by your analysis, you will need to supply an argument to `--plots`. If you have also specified `--save`, then `--plots` is the name and path of the pdf file you wish to save your plots to.
- - `--log` is the file name and path for logging output.\
-  (default: 'characterization.log')
- - `characterization3.py` creates intermediate files before producing a result. If `--no_clean_up` is supplied, then these files are not removed. This may be necessary when repeatedly appending to the same location.
+### Configuring New Analysis
+If you wish to perform fitting that there is not yet been implemented, you will need to add a new entry to the `fit_analysis_dict` in `analysis_lib.py`. This dictionary contains the configuration for each fit analysis, including the function to be used for fitting, the function to be used for testing the fit, and the function to be used for plotting the results. These functions follow a specific structure, which can been seen by examining the existing functions in `fit_analysis.py`. Once you have added your new entry to the `fit_analysis_dict` and updated the argparser in `main.py`, you will be able to use it in the `--fit_analysis` argument of `main.py`. Fit tests can be added in a similar manner, by adding a new entry to the `fit_test_dict` in `analysis_lib.py`. 
 
-#### Configuring Your Analysis
-If there is a piece of analysis, a fit line, or a fit test that you would like to do, you can create it. To configure a piece of analysis which is not a fit, create a function with arguments `*data, *args` and returns a single value, where `*data` is the data that you need for the analysis (ex. `time_data`, `energy_data`) and arguments are optional supplemental arguments that must be inputted in the configuration. If you would like your function to produce a plot, add fig, ax as your last two return values. Once this has been complete, add a new entry in self.general_analyses_config that follows this structure:
-```python
-{
-   'name': "A descriptive name for the general analysis, used for labeling results and plots" ("ex." 'Average Event Rate'),
-   'description': "A brief description of what the analysis does",
-   'func': "The function used to perform the general analysis" ("ex." average_generic),
-   'args': "Supplemental arguments to be supplied to the analysis function if necessary" ("ex." ['Baseline', 'mV']),
-   'input_data': "A list of data types required for the analysis" ("ex." ['Time', 'Baseline']),
-   'units': "The units of the output metric" ("ex." 'mV'),
-   'plot': "A boolean indicating whether this analysis creates a figure for plotting"
-},
-```
-To configure a piece of analysis which is a fit, you follow a very similar process. First, you must create your fitting function, which takes as its argument an unbinned data set and returns the fitting parameters. Then, add a new entry in self.fit_analyses_config that follows this structure:
-```python
-{
-   'name': "A descriptive name for the fit analysis, used for labeling results and plots" ("ex.", 'Landau-Gauss Height'),
-   'data_type': "The type of data being analyzed" ("ex.", 'Height'),
-   'data_transform_function': "A function to transform the raw data before fit analysis, or None if no transformation is needed" ("ex." times2event_rates),
-   'fit_func': The function used to fit the data ("ex.", landau_fit),
-   'pdf_func': "A lambda function that takes x and the fit parameters and returns the corresponding PDF values" ("ex." lambda x, params: landau.pdf(x, loc=params[0], scale=params[2])),
-   'param_names': "A list of parameter names corresponding to the fit parameters returned by fit_func" ("ex." ['mu', 'sigma_mu', 'c', 'sigma_c']),
-   'fit_type': "A string describing the type of fit performed" ("ex." 'Landau'),
-   'xlabel': "The label for the x-axis in plots, describing the quantity being analyzed" ("ex." 'Wavelength Peak'),
-   'units': "The units for the quantity being analyzed, used for labeling plots and results" ("ex." 'mV'),
-   'threshold' : "A float representing the threshold to be calculated and plotted based on the fitted CDF, or None if no threshold is to be calculated"
-},
-```
-To configure a fit test, create a function which takes as its arguments `data, fit_cdf, n_params` and returns the statistic and p-value of the test, where `data` is a set of unbinned data, `fit_cdf` is the cdf that fits the data, and `n_params` is the number of parameters estimated from the data to obtain your fit. Then, add a new entry in self.fit_analyses_config that follows this structure:
-```python
-"Key" ("ex." kolmogorov_smirnov): {
-   'func': "The function that performs the fit test, which should take the data and the fitted CDF as inputs and return the test statistic and p-value" ("ex." kolmogorov_smirnov),
-   'name': "A descriptive name for the fit test, used for labeling results" (e.g., 'Kolmogorov-Smirnov') 
-},
-```
+The framework for doing other kinds of analysis is not entirely fleshed out yet.
 
-#### Examples
-Suppose you wanted to look at how well a LanGauss distribution fits the individual channel height data for two runs, `test_0` and `test_8`, which used three channels. In this case, you could run the following two commands, and then compare the pdfs that you get
+### Help and Examples
+Some examples can be run by using the -e flag, aas well as the index of the example you want to run from globalvars.EXAMPLES. For example, to run the first example, you would do:
 ```bash
-python3 src/characterization3.py 3 settings_experimentation/test_0 --scope individual --general_analysis None --fit_analysis Landau-Gaussian Height --save settings_experimentation/results0 --plots settings_experimentation/results0 
-python3 src/characterization3.py 3 settings_experimentation/test_8 --scope individual --general_analysis None --fit_analysis Landau-Gaussian Height --save settings_experimentation/results8 --plots settings_experimentation/results8 
+python3 src/main.py -e 0
 ```
-
-If you would like to look at how the baseline changed for all three channels of `test_6`, you would use this command:
+You can access help for the arguments of `main.py` by using the -h flag:
 ```bash
-python3 src/characterization3.py 3 settings_experimentation/test_6 --scope aggregate --general_analysis Average Baseline --fit_analysis None --plots y
+python3 src/main.py -h
 ```
 
 ### `batch_characterization.sh`
-This script is intended to allow for the batch characterization of several run results at once. These run results must each be a CoMPASS output directories named `test_{n}`, which allows `batch_characterization.sh` to iterate between a stop and start run result, given the name of the directory these run results are in. `characterization3.py` is run on each of these run results, and the outputs are collected in a single .xlsx file. `batch_characterization.sh` takes the following form:
+Currently deprecated
+<span style="opacity: 0.5;">This script is intended to allow for the batch characterization of several run results at once. These run results must each be a CoMPASS output directories named `test_{n}`, which allows `batch_characterization.sh` to iterate between a stop and start run result, given the name of the directory these run results are in. `characterization3.py` is run on each of these run results, and the outputs are collected in a single .xlsx file. `batch_characterization.sh` takes the following form:
 ```
 batch_characterization3.sh <target_directory> <start_integer> <stop_integer> [path_to_characterization3]
 ```
@@ -131,17 +80,12 @@ A description of the arguments is as follows:
  - `end_integer`                        : The index of the last subdirectory (exclusive)\
    &emsp;ex. 6 => last processed subdirectory is test_5
  - `path_to_characterization3` (opt) : If characterization3.py is not in the same directory as batch_characterization3.sh, will need to provide the path to characterization3.py as the 4th argument.   
-
-#### Examples
-To perform batch characterization of the first 5 run results in settings_experimentation, you would do 
-```bash
-./src/batch_characterization3.sh settings_experimentation 0 5
-```
+</span>
 
 ### `compass_result_splitter.py`
 This script splits a CoMPASS run result into synchronized, fixed-duration chunks while preserving the original `RAW` folder and channel file structure.
 
-#### Running `compass_result_splitter.py` in Terminal
+### Running `compass_result_splitter.py` in Terminal
 `compass_result_splitter.py` takes the following positional arguments:
  - `parent_dir`: Parent directory containing the `RAW` subdirectory with channel ROOT files.
  - `n_channels`: Number of channels to parse.
@@ -160,7 +104,7 @@ The script writes output in the form:
 
 Each output chunk is generated from the common time windows present in all channels.
 
-#### Examples
+### More Examples
 To split `settings_experimentation/test_0` into 60-second synchronized chunks using three channels:
 ```bash
 python3 src/compass_result_splitter.py settings_experimentation/test_0 3 60
