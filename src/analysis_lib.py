@@ -68,7 +68,8 @@ def langauss_fit(data):
    n,bins = np.histogram(data, bins=int(np.sqrt(len(data))))
    half_bins, cdf = cdf_hist(n,bins)
 
-   mu0,_,c0,_ = landau_fit(data)
+   landau_params,landau_param_errs = landau_fit(data)
+   mu0,c0 = landau_params
    p0 = [mu0, c0, 6*c0]  # landau mpv, landau width, 6x landau width
    popt, pcov = curve_fit(
       lambda x, landau_x_mpv, landau_xi, gauss_sigma: langauss.cdf(x, landau_x_mpv=landau_x_mpv, landau_xi=landau_xi, gauss_sigma=gauss_sigma), 
@@ -191,7 +192,7 @@ fit_lib = {
       'data_type': 'Energy',
       'fit_func': exp_mod_gauss_fit,
       'pdf_func': lambda x, params: exponnorm.pdf(x, *params),
-      'param_names': ['K', 'mu', 'sigma'],
+      'params': ['K', 'mu', 'sigma'],
       'threshold' : None
    },
 }
@@ -203,10 +204,10 @@ fit_test_lib = {
    },
    'chi2': {
       'func': chi_squared,
-      'args': False,
+      'args': None,
    },
    'chi2/ndof': {
       'func': chi_squared,
-      'args': True,
+      'args': [True,],
    },
 }

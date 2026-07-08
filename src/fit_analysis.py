@@ -45,15 +45,14 @@ class FitResult:
       self.params, self.param_errs = self.ana['fit_func'](self.data)
 
       # Create output string
-      out_str = f"\n{self.ana['fit_type']} fit results:\n"
-      out_str = out_str + ('-' * len(self.ana['fit_type']) + 13) + '\n'
-      for i in range(len(self.params)): out_str += f'{self.ana['params'][i]:^15} |'
+      out_str = ''
+      for i in range(len(self.params)): out_str += f'{self.ana['params'][i]:^16}|'
       out_str += '\n'
       for i in range(len(self.params)): out_str += ('-'*15 + '-+')
       out_str += '\n'
-      for i in range(len(self.params)): out_str += f'  {self.params[i]:>13.2f} |'
+      for i in range(len(self.params)): out_str += f'   {self.params[i]:>12.2f} |'
       out_str += '\n'
-      for i in range(len(self.params)): out_str += f'± {self.param_errs[i]:>13.2f} |'
+      for i in range(len(self.params)): out_str += f' ± {self.param_errs[i]:>12.2f} |'
       out_str += '\n'
       
       # Display or print to terminal as specified
@@ -63,9 +62,10 @@ class FitResult:
          logger.info(out_str)
 
    def fit(self, fit_tests, logger=None, save=False):
+      display = not save
       # Display/log output header based on save status
-      output_line = f"Analysis: {self.ana['data_type']} data with {self.ana_name} fit, Channel: {self.ch}"
-      if not save:
+      output_line = f"\nAnalysis: {self.ana['data_type']} data with {self.ana_name} fit, Channel: {self.ch}"
+      if display:
          print(output_line)
          for _ in range(len(output_line)): print('=', end='')
          print()
@@ -73,21 +73,15 @@ class FitResult:
          logger.info(output_line)
 
       # Fit distribution
-      self.compute_params(self.data, display=(not save), logger=logger)
+      self.compute_params(display=display, logger=logger)
 
       # Generate fit CDF and plots
-      self.generate_fit(self.data, display=(not save), logger=logger)
+      self.generate_fit(display=display, logger=logger)
 
       # Perform fit tests if specified
       if fit_tests:
-         out_str = "\nFit test results:\n"
-         out_str +=  '================='
-         if not save:
-            print(out_str)
-         if logger:
-            logger.info(out_str)
          for test_name in fit_tests:
-            self.perform_fit_test(self.data, test_name, display=(not save), logger=logger)
+            self.perform_fit_test(test_name, display=display, logger=logger)
 
       # Generate plots with fit results
       self.generate_fig(save)
@@ -157,13 +151,13 @@ class FitResult:
       # Generate xgrid, create corresponding pdf values, convert to cdf and interpolate
       self.xgrid = np.linspace(np.min(self.data), np.max(self.data), grid_size)
       self.ypdf = self.ana['pdf_func'](self.xgrid, self.params)
-      self.fit_cdf = make_interp_spline(self.xgrid, al.pdf2cdf(self.xgrid, self.ypdf), 5)
+      self.cdf = make_interp_spline(self.xgrid, al.pdf2cdf(self.xgrid, self.ypdf), 5)
 
       # Calculate threshold if applicable
       thresh_level = self.ana['threshold']
       if thresh_level:
-         self.thresh = root_scalar(lambda t:self.cdf(t)-self.thresh_level,bracket=(min(self.xgrid),max(self.xgrid))).root
-         out_str = f'{self.ana['threshold']*100:.2f}% threshold: {self.thresh:.6g}'
+         self.thresh = root_scalar(lambda t:self.cdf(t)-thresh_level,bracket=(min(self.xgrid),max(self.xgrid))).root
+         out_str = f'{thresh_level*100:.2f}% threshold: {self.thresh:.6g}'
          if display:
             print(out_str)
          if logger:
@@ -181,14 +175,17 @@ class FitResult:
 
       # Perform the fit test
       test = al.fit_test_lib[test_name]
-      stat, pvalue = test['func'](self.data, self.cdf, len(self.params))
+      if test['args']:  
+         stat, pvalue = test['func'](self.data, self.cdf, len(self.params), *test['args'])
+      else:
+         stat, pvalue = test['func'](self.data, self.cdf, len(self.params))
 
       # Add to self.test_results
       self.test_results[f"{test_name} Statistic"] = stat
       self.test_results[f"{test_name} P-Value"] = pvalue
 
       # Display or print to terminal as specified
-      out_str = f"  {test_name} statistic={stat:.6g}, p-value={pvalue:.6g}"
+      out_str = f"{test_name} statistic={stat:.6g}, p-value={pvalue:.6g}"
 
       if display:
          print(out_str)
@@ -202,13 +199,15 @@ class FitResult:
       # Include channel and threshold
       self.result_row = {
          'Channel': self.ch if self.ch is not None else 'all',
-         f'{self.ana['threshold']*100:.2f}% Threshold': self.thresh,
       }
+      if self.ana['threshold']: self.result_row[f'{self.ana['threshold']*100:.2f}% Threshold'] =  self.thresh
       
       # Include parameters and their errors
       param_dict = dict(zip(self.ana['params'], self.params))
       param_err_dict = dict(zip(f'{self.ana['params']} Error', self.param_errs))
-      self.result_row.update(param_dict, param_err_dict)
+      self.result_row.update(param_dict)
+      self.result_row.update(param_err_dict)
+      
 
       # Include fit-test result
       self.result_row.update(self.test_results)
@@ -217,26 +216,13 @@ class FitResult:
       '''
       Writes a brief summary of results
       '''
-      summary_lines = {}
+      summary_lines = []
       # Parameter ± error
-      summary_lines.extend([f'{self.ana['params'][i]}: {self.params[i]:.6g} ± {self.param_errs[i]:.1g}'  for i in range(len(self.params))])
+      summary_lines.extend([f'{self.ana['params'][i]}: {self.params[i]:.6g} ± {self.param_errs[i]:.2g}'  for i in range(len(self.params))])
       # Fit-test statistic
-      statistic_keys = list(self.test_results.keys)[0::2]
+      statistic_keys = list(self.test_results.keys())[0::2]
       summary_lines.extend([f'{key}: {self.test_results[key]:.6g}' for key in statistic_keys])
       # Threshold
-      summary_lines[f'{self.ana['threshold']*100:.2f}% threshold'] = f'{self.thresh:.6g}'
+      if self.ana['threshold']: summary_lines.append(f'{self.ana['threshold']*100:.2f}% threshold: {self.thresh:.6g}')
     
       return "\n".join(summary_lines)
-      
-def fit_analysis(self, fit_tests, logger=None, save=False):
-   '''
-   Performs the specified fit analysis on the given data based on the scope.
-   Fits the appropriate distribution, performs the specified fit tests, generates plots if requested, and compiles results into a structured format for saving or display.
-   Parameters:
-      data (array-like): The (possibly transformed) data to be analyzed.
-      fit_analysis (dict): The fit analysis configuration dict from fit_analyses_config.
-      scope (str): The scope of analysis ('individual' or 'aggregate').
-      channel (int, optional): The channel number for individual analyses; None for aggregate analyses.
-   Returns:
-      None (results are printed and/or saved based on user configuration)
-   '''
