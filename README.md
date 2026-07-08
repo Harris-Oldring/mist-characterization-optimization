@@ -1,23 +1,6 @@
 # mist-characterization-optimization
 Useful scripts, CAEN DT5751 digitizer data, and Jupyter notebooks created while optimizing the P-ONE-D MIST characterization process. 
 
-## Description of Directories, Scripts, and Notebooks
- * `src` : Contains the analysis scripts
-    * `characterization3.py` : The main analysis script
-    * `batch_characterization3.sh` : A script to run `characterization3.py` on several run results at once
-    * `compass_result_splitter.py` : A script to break a given run result into several smaller run results of a given duration
-    * `batch_split_and_characterize` : Bare-bones script helpful to run `compass_result_splitter.py` and `batch_characterization3.sh` many times
- * `analysis` : Contains several Jupyter notebooks, which were used to develop the analysis scripts
-    * `characterization_development.ipynb` : Development notebooks for the current version of `characterization3.py`
-       * `fitting_experimenting1.ipynb` : Was used to explore fitting techniques
-       * `fitting_experimenting2.ipynb` : Was used to explore fitting techniques, specifically binning
-       * `testing_fit_testing.ipynb` : Was used to explore fit tests
-    * `sample_duration.ipynb` : Used to explore how the sample duration of data affects the uncertainty of various analyses
-       * `varied_sample_durations1.ipynb` : Initial exploration of how the sample duration of data affects the uncertainty of fit parameters for the event rate analysis, which fits a LanGauss distribution to the histogram of event rates calculated from inter-event times
-       * `varied_sample_durations2.ipynb` : Further analysis of the same kind which is cleaner, clearer, and more robust
-       * `variance.ipynb` : Used to explore how our fit parameters and their uncertainties change between samples of the same duration
- * `data` : Sample data with descriptions
-
 ## Installation
 ### Prerequisites
 * Python>=3.14
@@ -46,6 +29,23 @@ Here are the instructions and requirements for setting up mist-characterization-
    ```
 5. **Manually update landaupy**
    Change lines 215 and 133 of landau.py and langauss.py, respectively, to replace `np.trapz` with `np.trapezoid` to avoid a warning about the deprecation of `np.trapz` for integration in favor of `np.trapezoid`.
+
+## Overview of Repository Structure
+ * `src` : Contains the analysis scripts
+    * `characterization3.py` : The main analysis script
+    * `batch_characterization3.sh` : A script to run `characterization3.py` on several run results at once
+    * `compass_result_splitter.py` : A script to break a given run result into several smaller run results of a given duration
+    * `batch_split_and_characterize` : Bare-bones script helpful to run `compass_result_splitter.py` and `batch_characterization3.sh` many times
+ * `analysis` : Contains several Jupyter notebooks, which were used to develop the analysis scripts
+    * `characterization_development.ipynb` : Development notebooks for the current version of `characterization3.py`
+       * `fitting_experimenting1.ipynb` : Was used to explore fitting techniques
+       * `fitting_experimenting2.ipynb` : Was used to explore fitting techniques, specifically binning
+       * `testing_fit_testing.ipynb` : Was used to explore fit tests
+    * `sample_duration.ipynb` : Used to explore how the sample duration of data affects the uncertainty of various analyses
+       * `varied_sample_durations1.ipynb` : Initial exploration of how the sample duration of data affects the uncertainty of fit parameters for the event rate analysis, which fits a LanGauss distribution to the histogram of event rates calculated from inter-event times
+       * `varied_sample_durations2.ipynb` : Further analysis of the same kind which is cleaner, clearer, and more robust
+       * `variance.ipynb` : Used to explore how our fit parameters and their uncertainties change between samples of the same duration
+ * `data` : Sample data with descriptions
 
 ## Usage
 ### `characterization3.py`

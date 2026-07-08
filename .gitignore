@@ -1,10 +1,9 @@
 .DS_Store
 *.log
-data/results/*
-data/test_0_*
-data/test_1_*
+data
 analysis/characterization_development/test_*
 analysis/characterization_development/Scenario_5_Revised_Run
 data
 characterization_example
 src/__pycache__
+analysis/sample_duration/old_variance_results
