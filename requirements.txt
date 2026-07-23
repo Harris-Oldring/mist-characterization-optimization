@@ -8,3 +8,4 @@ landaupy==0.1.0
 fpdf==2.8.7
 pypdf==6.14.2
 tqdm==4.68.2
+shapely==2.1.2

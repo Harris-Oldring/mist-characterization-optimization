@@ -58,7 +58,7 @@ If you wish to perform fitting that there is not yet been implemented, you will 
 The framework for doing other kinds of analysis is not entirely fleshed out yet.
 
 ### Help and Examples
-Some examples can be run by using the -e flag, aas well as the index of the example you want to run from globalvars.EXAMPLES. For example, to run the first example, you would do:
+Some examples can be run by using the -e flag, aas well as the index of the example you want to run from `src/globalvars.EXAMPLES`. For example, to run the example 0, you would do:
 ```bash
 python3 src/main.py -e 0
 ```

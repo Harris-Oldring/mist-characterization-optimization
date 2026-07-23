@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.stats import norm, exponnorm, landau, kstest, anderson, anderson_ksamp, chisquare, gaussian_kde, skew
+from scipy.stats import norm, exponnorm, landau, kstest, anderson, anderson_ksamp, chisquare, gaussian_kde, skew, poisson
 from scipy.interpolate import BarycentricInterpolator,interp1d,make_interp_spline
 from scipy.integrate import quad
 from scipy.optimize import curve_fit,root_scalar
@@ -123,6 +123,17 @@ def exp_mod_gauss_fit(data):
    sigma_popts=np.sqrt(np.diag(pcov))
    return popt,sigma_popts
 
+def poisson_fit(data):
+   '''
+   Given a set of data, fits a Poisson distribution
+   Returns:
+   popt - The fit parameters K, mu, and sigma
+   sigma_popts - The error in K, mu, and sigma obtained through curve_fit
+   '''
+   popt, pcov = curve_fit(lambda k,lam : poisson.pmf(k,lam), np.arange(0, max(data)+1), np.bincount(data))
+   sigma_popts=np.sqrt(np.diag(pcov))
+   return popt,sigma_popts
+
 
 ##FIT TESTING
 def kolmogorov_smirnov(data, fit_cdf, n_params):
@@ -193,6 +204,13 @@ fit_lib = {
       'fit_func': exp_mod_gauss_fit,
       'pdf_func': lambda x, params: exponnorm.pdf(x, *params),
       'params': ['K', 'mu', 'sigma'],
+      'threshold' : None
+   },
+   'Poisson' : {
+      'data_type': 'Energy',
+      'fit_func': poisson_fit,
+      'pdf_func': lambda k, params: poisson.pmf(k, *params),
+      'params': ['lambda'],
       'threshold' : None
    },
 }
