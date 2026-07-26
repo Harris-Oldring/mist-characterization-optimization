@@ -18,7 +18,7 @@ plot_config = {
 }
 
 class FitResult:
-   def __init__(self, data, ana_name, ch, fit_tests, logger=None, save=False):
+   def __init__(self, data, ana_name, ch, fit_tests, logger=None, display=False):
       self.ana_name = ana_name
       self.ana = al.fit_lib[ana_name]
       self.ch = ch
@@ -33,7 +33,7 @@ class FitResult:
       self.result_row = {}
       self.fig = None
 
-      self.fit(fit_tests, logger=logger, save=save)
+      self.fit(fit_tests, logger=logger, display=display)
 
    def compute_params(self, display=False, logger=None):
       '''
@@ -61,8 +61,7 @@ class FitResult:
       if logger:
          logger.info(out_str)
 
-   def fit(self, fit_tests, logger=None, save=False):
-      display = not save
+   def fit(self, fit_tests, logger=None, display=False):
       # Display/log output header based on save status
       output_line = f"\nAnalysis: {self.ana['data_type']} data with {self.ana_name} fit, Channel: {self.ch}"
       if display:
@@ -84,12 +83,12 @@ class FitResult:
             self.perform_fit_test(test_name, display=display, logger=logger)
 
       # Generate plots with fit results
-      self.generate_fig(save)
+      self.generate_fig(display)
 
       # Update result_row
       self.update_result_row()
 
-   def generate_fig(self, save):
+   def generate_fig(self, display):
       '''
       Creates a figure containing a histogram with a fitted pdf, a histogram with a fitted cdf, and key fit information
       '''
@@ -132,7 +131,7 @@ class FitResult:
       fig.text(0.01, 0.02, self.write_summary(), fontsize=8, va='bottom', ha='left')
       
       # Show figure if relevant
-      if not save:
+      if display:
          plt.show()
 
       # Save figure

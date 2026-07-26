@@ -8,6 +8,7 @@ import data_processing as dp
 import analysis_lib as al
 import fit_analysis as fa
 import save_lib as sv
+import char_test_lib as ct
 
 def check_arg(testbool, errtype, logger, errtext=None):
     if not testbool:
@@ -18,10 +19,10 @@ def main():
     parser = argparse.ArgumentParser(description="Characterize data from multiple channels with various analyses and fit tests.")
     parser.add_argument('-save','-s', help="Saves results files instead of printing to terminal", action="store_false")
     parser.add_argument('-example','-e', type = int, choices=[0,1,2], help="Runs an example to test that the code runs and is installed correctly.", default = -1)
-    # TODO: Update parent_dir (& EXAMPLES) default once I have assets structure
-    parser.add_argument('-parent_dir','-p', type=str, help="Parent directory containing RAW subdirectory with channel data files.",default='')
+    parser.add_argument('-parent_dir','-p', type=str, help="Parent directory containing RAW subdirectory with channel data files.")
     parser.add_argument('-n_channels','-n', type=int, help="Number of channels to analyze. If empty, analyze all channels available.",default=None)
     parser.add_argument('-outfolder','-o', type=str, default=None, help="Folder name to send logging and results files, or None to not save results and disable logging (default: f'{parent_dir}_results').")
+    parser.add_argument('-char_test', '-c', nargs='+', default=None, help="If this is a proper characterization test (pass/fail), provide a list with the scintillator ids in the order fo the channel they are on. Otherwise don't use this flag.")
     parser.add_argument('-scope', type=str, choices=['Individual', 'Aggregate', 'Both'], default='Both', help="Scope of analysis: 'Individual', 'Aggregate', or 'Both' (default: 'Both').")
     # parser.add_argument('--analyses', nargs='+', default=None, help="List of non-fitting, non-standard analyses to perform by name (default: None).")
     parser.add_argument('-fits', nargs='+', default=['Langauss', 'EMG'], help="List of fit analyses to perform by name (default: ['Langauss', 'EMG']).")
@@ -32,7 +33,7 @@ def main():
     # Initialization
     if args.example in [0,1,2]:
         ## Ignore everything else and use example data and preset settings
-        save, parent_dir, n_channels, scope, fits, fit_tests = EXAMPLES[args.example]
+        save, parent_dir, n_channels, char_test, scope, fits, fit_tests = EXAMPLES[args.example]
         outfolder = Path('characterization_example')
         outfolder.mkdir(parents=True, exist_ok=True)
         logger = logging.getLogger(__name__)
@@ -42,8 +43,8 @@ def main():
         parent_dir = args.parent_dir
         outfolder = Path(args.outfolder) if args.outfolder else Path(f'{parent_dir}_results')
         outfolder.mkdir(parents=True, exist_ok=True)
-        n_channels, scope = args.n_channels, args.scope
-        fits, fit_tests = args.fits, args.fit_tests
+        char_test = args.n_channels, args.char_test 
+        n_channels, scope, fits, fit_tests = args.scope, args.fits, args.fit_tests if not char_test else len(char_test), 'Individual', ['Langauss', 'EMG'], ['chi2/ndof']
         ### Set up logging
         if len(args.log>0):
             if len(args.log)!=2: raise ValueError(f"--log argument must be tuple of length 0 or 2, not {len(args.log)}")
@@ -121,7 +122,7 @@ def main():
         out_str += (str(data) + '\n')
         base.append([str(data.channel), str(data.NEvents), f'{data.duration:.2f}', str(data.event_rate), str(data.Eoverflows)])
 
-    if not save:
+    if not save and not char_test:
         print(out_str)
     if logger:
         logger.info(out_str)
@@ -135,11 +136,14 @@ def main():
         data_type =  al.fit_lib[fit]['data_type']
         for dataset in data_to_analyze:
             data = dataset.db[data_type]
-            fit_results.append(fa.FitResult(data=data, ana_name=fit, ch=dataset.channel, fit_tests=fit_tests, logger=logger, save=save))
+            fit_results.append(fa.FitResult(data=data, ana_name=fit, ch=dataset.channel, fit_tests=fit_tests, logger=logger, display=(not save and not char_test)))
         results[fit] = fit_results
 
     # Save all the stuff to output folder if requested
     if save: sv.save_to_folder(outfolder, parent_dir.name, base, results, logger=logger)
+
+    # Perform characterization testing if requested
+    if char_test: ct.pass_or_fail(outfolder, char_test, base, results, logger=logger)
 
 
 if __name__ == "__main__":

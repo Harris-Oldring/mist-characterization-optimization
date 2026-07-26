@@ -1,9 +1,9 @@
 from pathlib import Path
 
 EXAMPLES = [
-   [False, Path('assets') / 'PONE1_settings_600s_80ECG', 3, 'Individual', ['Langauss', 'EMG'], ['chi2/ndof']],
-   [True, Path('assets') / 'PONE1_settings_7200s', 3, 'Both', ['Langauss', 'EMG'], ['chi2/ndof']],
-   [True, Path('assets') / 'PONE1_settings_6400s', 3, 'Both', ['Landau', 'Langauss', 'EMG'], ['KS', 'chi2', 'chi2/ndof']],
+   [False, Path('assets') / 'PONE1_settings_600s_80ECG', 3, None, 'Individual', ['Langauss', 'EMG'], ['chi2/ndof']],
+   [True, Path('assets') / 'PONE1_settings_7200s', 3, None, 'Both', ['Langauss', 'EMG'], ['chi2/ndof']],
+   [True, Path('assets') / 'PONE1_settings_6400s', 3, None, 'Both', ['Landau', 'Langauss', 'EMG'], ['KS', 'chi2', 'chi2/ndof']],
 ]
 
 #DIGITIZER SETTINGS

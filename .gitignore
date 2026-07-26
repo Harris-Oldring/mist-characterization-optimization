@@ -5,5 +5,5 @@ analysis/characterization_development/test_*
 analysis/characterization_development/Scenario_5_Revised_Run
 data
 characterization_example
-src/__pycache__
+__pycache__
 analysis/sample_duration/old_variance_results
