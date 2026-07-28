@@ -39,7 +39,7 @@ Here are the instructions and requirements for setting up mist-characterization-
    python3 -m venv .venv
    .\.venv\Scripts\Activate.ps1
    ```
-   Note: You may need to temporarily change the execution policy to allow scripts to run. You can do this by running the following command in PowerShell as an administrator:
+   Note: If you experience difficulties during this step, you may need to temporarily change the execution policy to allow scripts to run. You can do this by running the following command in PowerShell as an administrator:
    ```powershell
    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
    ```
