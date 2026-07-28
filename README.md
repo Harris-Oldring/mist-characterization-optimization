@@ -37,7 +37,7 @@ Here are the instructions and requirements for setting up mist-characterization-
 2. **Create and activate a virtual environment**
    ```powershell
    python3 -m venv .venv
-   source .venv\Scripts\Activate.ps1
+   .\.venv\Scripts\Activate.ps1
    ```
    Note: You may need to temporarily change the execution policy to allow scripts to run. You can do this by running the following command in PowerShell as an administrator:
    ```powershell
