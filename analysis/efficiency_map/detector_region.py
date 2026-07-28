@@ -40,14 +40,21 @@ class DetectorRegion:
       dts = reference - self.nmt
       self.dt_params,_ = gauss_fit(dts)
       if plot:
-         plt.title(f"Histogram of Timing Differences (Channel {self.ch})")
-         plt.xlabel(r"$\Delta t$ (s)")
+         plt.figure(figsize=(3,4))
+         # plt.title(f"Histogram of Timing Differences (Channel {self.ch})")
+         # plt.title("Sample Histogram of Timing Differences Between Two Scintillators")
+         plt.xlabel(r"$\Delta t$ (ns)")
          plt.ylabel("Probability Density")
-         plt.hist(dts,bins=round(np.sqrt(len(dts))),density=True,label="Raw data")
-         x = np.linspace(np.min(dts),np.max(dts),1000)
-         mu, sigma = self.dt_params
-         plt.plot(x,norm.pdf(x, loc=mu, scale=sigma), label=r"$\mu$="+f"{mu}"+r"$\sigma$="+f"{sigma}")
-         plt.legend()
+         plt.hist(dts*1e9,bins=round(np.sqrt(len(dts))),density=True,label="Raw data")
+         x = np.linspace(np.min(dts),np.max(dts),1000)*1e9
+         mu, sigma = self.dt_params*1e9
+         plt.plot(x,norm.pdf(x, loc=mu, scale=sigma),label='Gaussian Fit')
+         print(r"$\mu$="+f"{mu:.2f} ns\n"+r"$\sigma$="+f"{sigma:.2f} ns",norm.pdf(x, loc=mu, scale=sigma)[333])
+         i_max = np.argmax(norm.pdf(x, loc=mu, scale=sigma))
+         ytext = norm.pdf(x, loc=mu, scale=sigma)[i_max]/2
+         xtext = x[(1000-i_max)//2] if i_max > 500 else x[i_max//2]
+         # plt.text(xtext,ytext,r"$\mu$="+f"{mu:.2f} ns\n"+r"$\sigma$="+f"{sigma:.2f} ns")
+         # plt.legend()
          plt.show()
          
       return self.dt_params
