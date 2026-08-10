@@ -6,13 +6,12 @@ Useful scripts, CAEN DT5751 digitizer data, and Jupyter notebooks created while 
 * Python>=3.14
 * Git
 
-### Setup Instructions
-Here are the instructions and requirements for setting up mist-characterization-optimization for yourself (macOS/Linux)
+### MacOS/Linux Setup Instructions
+Here are the instructions and requirements for setting up mist-characterization-optimization for yourself
 
 1. **Clone the repository:**
    ```bash
-   git clone git@github.com:your-username/your-repo-name.git
-   cd your-repo-name
+   git clone https://github.com/Harris-Oldring/mist-characterization.git
    ```
 2. **Create and activate a virtual environment**
    ```bash
@@ -25,6 +24,31 @@ Here are the instructions and requirements for setting up mist-characterization-
    ```
 4. **Verify the installation**
    ```bash
+   python3 src/main.py -h
+   ```
+5. **Manually update landaupy**
+   Change lines 215 and 133 of landau.py and langauss.py, respectively, to replace `np.trapz` with `np.trapezoid` to avoid a warning about the deprecation of `np.trapz` for integration in favor of `np.trapezoid`.
+
+### Windows Setup Instructions
+1. **Clone the repository:**
+   ```powershell
+   git clone https://github.com/Harris-Oldring/mist-characterization.git
+   ```
+2. **Create and activate a virtual environment**
+   ```powershell
+   python3 -m venv .venv
+   .\.venv\Scripts\Activate.ps1
+   ```
+   Note: If you experience difficulties during this step, you may need to temporarily change the execution policy to allow scripts to run. You can do this by running the following command in PowerShell as an administrator:
+   ```powershell
+   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
+   ```
+3. **Install dependencies**
+   ```powershell
+   pip install -r requirements.txt
+   ```
+4. **Verify the installation**
+   ```powershell
    python3 src/main.py -h
    ```
 5. **Manually update landaupy**
