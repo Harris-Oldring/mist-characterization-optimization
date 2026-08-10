@@ -16,7 +16,7 @@ def check_arg(testbool, errtype, logger, errtext=None):
 
 def main():
     parser = argparse.ArgumentParser(description="Characterize data from multiple channels with various analyses and fit tests.")
-    parser.add_argument('-save','-s', help="Saves results files instead of printing to terminal", action="store_false")
+    parser.add_argument('-save','-s', help="Saves results files instead of printing to terminal", action="store_true")
     parser.add_argument('-example','-e', type = int, choices=[0,1,2], help="Runs an example to test that the code runs and is installed correctly.", default = -1)
     # TODO: Update parent_dir (& EXAMPLES) default once I have assets structure
     parser.add_argument('-parent_dir','-p', type=str, help="Parent directory containing RAW subdirectory with channel data files.",default='')
@@ -39,13 +39,13 @@ def main():
         logging.basicConfig(filename=outfolder / (str(int(time.time()))+'.log'), encoding='utf-8', level='INFO')
     else:
         ## Use User Input
-        parent_dir = args.parent_dir
+        parent_dir = Path(args.parent_dir)
         outfolder = Path(args.outfolder) if args.outfolder else Path(f'{parent_dir}_results')
         outfolder.mkdir(parents=True, exist_ok=True)
-        n_channels, scope = args.n_channels, args.scope
+        save, n_channels, scope = args.save, args.n_channels, args.scope
         fits, fit_tests = args.fits, args.fit_tests
         ### Set up logging
-        if len(args.log>0):
+        if len(args.log)>0:
             if len(args.log)!=2: raise ValueError(f"--log argument must be tuple of length 0 or 2, not {len(args.log)}")
             if (not isinstance(args.log[0],str)) or (not isinstance(args.log[1],str)): raise ValueError(f"--log argument must be tuple of strings")
             logger = logging.getLogger(__name__)
