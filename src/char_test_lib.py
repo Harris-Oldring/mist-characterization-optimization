@@ -1,6 +1,11 @@
+import openpyxl
+from openpyxl.styles import PatternFill
+from openpyxl.utils.dataframe import dataframe_to_rows
 import pandas as pd
 import numpy as np
 from scipy import stats
+
+REDFILL, GREENFILL = PatternFill(start_color='F01E2C',end_color='F01E2C',fill_type='solid'),PatternFill(start_color='3BB143',end_color='3BB143',fill_type='solid')
 
 '''
 Change default to True to evaluate based on defined maximum and minimum rather than comparing to other scintillators 
@@ -12,8 +17,8 @@ acceptance_lib = {
       'func': lambda std_results, ch: std_results[ch][3],
       'maximum': None,
       'minimum': None,
-      'too_big': 'Unusually high event rate. Check for light leaks.',
-      'too_small': 'Unusually low event rate.',
+      'too_big': 'Check for light leaks (high event rate).',
+      'too_small': 'Check for something blocking your scintillators (low event rate).',
    },
    'Energy Overflows': {
       'default': True,
@@ -21,8 +26,8 @@ acceptance_lib = {
       'func': lambda std_results, ch: std_results[ch][4],
       'maximum': None,
       'minimum': None,
-      'too_big': 'Unusually high amount of energy saturation. (number of energy overflows)',
-      'too_small': 'Unusually low amount of energy saturation. (number of energy overflows)',
+      'too_big': 'High energy saturation.',
+      'too_small': 'Low energy saturation.',
    },
    'Langauss MPV': {
       'default': True,
@@ -30,8 +35,8 @@ acceptance_lib = {
       'func': lambda fit_results, ch: fit_results['Langauss'][ch].params[0],  
       'maximum': None,
       'minimum': None,
-      'too_big': 'Unusually high mpv of pulse height distribution. This indicates a larger-than-expected light yield.',
-      'too_small': 'Unusually low mpv of pulse height distribution. This indicates a small light yield or noisy signal.',
+      'too_big': 'Larger-than-expected light yield (high mpv of pulse height distribution).',
+      'too_small': 'Small light yield or noisy signal (low mpv of pulse height distribution).',
    },
    'Langauss \u03C7\u00B2/ndof': { # chi^2/ndof
       'default': True,
@@ -39,8 +44,8 @@ acceptance_lib = {
       'func': lambda fit_results, ch: fit_results['Langauss'][ch].test_results[f"chi2/ndof Statistic"],  
       'maximum': None,
       'minimum': None,
-      'too_big': '\u03C7\u00B2/ndof of Langauss fit/height distribution is significantly higher than expected.',
-      'too_small': '\u03C7\u00B2/ndof of Langauss fit/height distribution is significantly lower than expected.',
+      'too_big': 'High \u03C7\u00B2/ndof of Langauss fit (height)',
+      'too_small': 'Low \u03C7\u00B2/ndof of Langauss fit (height)',
    },
    'Threshold': {
       'default': True,
@@ -48,35 +53,8 @@ acceptance_lib = {
       'func': lambda fit_results, ch: fit_results['Langauss'][ch].thresh,  
       'maximum': None,
       'minimum': None,
-      'too_big': 'Threshold is significantly higher than expected. Check light yield,',
-      'too_small': 'Threshold is significantly lower than expected. Check light yield and noise levels.',
-   },
-   'Energy K': {
-      'default': True,
-      'std_results': False,
-      'func': lambda fit_results, ch: fit_results['EMG'][ch].params[0],  
-      'maximum': None,
-      'minimum': None,
-      'too_big': '$K$ parameter of energy spectrum is significantly higher than expected.',
-      'too_small': '$K$ parameter of energy spectrum is significantly lower than expected.',
-   },
-   'Energy \u03BC': { # mu
-      'default': True,
-      'std_results': False,
-      'func': lambda fit_results, ch: fit_results['EMG'][ch].params[1],  
-      'maximum': None,
-      'minimum': None,
-      'too_big': '\u03BC parameter of energy spectrum is significantly higher than expected.',
-      'too_small': '\u03BC parameter of energy spectrum is significantly lower than expected.',
-   },
-   'Energy \u03C3': { # sigma
-      'default': True,
-      'std_results': False,
-      'func': lambda fit_results, ch: fit_results['EMG'][ch].params[2],  
-      'maximum': None,
-      'minimum': None,
-      'too_big': '\u03C3 parameter of energy spectrum is significantly higher than expected.',
-      'too_small': '\u03C3 parameter of energy spectrum is significantly lower than expected.',
+      'too_big': 'High threshold. Check light yield,',
+      'too_small': 'Low threshold. Check light yield and noise levels.',
    },
    'Energy \u03C7\u00B2/ndof': { # chi^2/ndof 
       'default': True,
@@ -84,32 +62,57 @@ acceptance_lib = {
       'func': lambda fit_results, ch: fit_results['EMG'][ch].test_results[f"chi2/ndof Statistic"],  
       'maximum': None,
       'minimum': None,
-      'too_big': '\u03C7\u00B2/ndof of EMG fit/energy spectrum is significantly higher than expected.',
-      'too_small': '\u03C7\u00B2/ndof of EMG fit/energy spectrum is significantly lower than expected.',
+      'too_big': '\u03C7\u00B2/ndof of EMG fit (energy)',
+      'too_small': '\u03C7\u00B2/ndof of EMG fit (energy)',
+   },
+   'Energy \u03BC': { # mu
+      'default': True,
+      'std_results': False,
+      'func': lambda fit_results, ch: fit_results['EMG'][ch].params[1],  
+      'maximum': None,
+      'minimum': None,
+      'too_big': 'High \u03BC parameter (energy spectrum)',
+      'too_small': 'Low \u03BC parameter (energy spectrum)',
+   },
+   'Energy \u03C3': { # sigma
+      'default': True,
+      'std_results': False,
+      'func': lambda fit_results, ch: fit_results['EMG'][ch].params[2],  
+      'maximum': None,
+      'minimum': None,
+      'too_big': 'High \u03C3 parameter (energy spectrum)',
+      'too_small': 'Low \u03C3 parameter (energy spectrum)',
+   },
+   'Energy K': {
+      'default': True,
+      'std_results': False,
+      'func': lambda fit_results, ch: fit_results['EMG'][ch].params[0],  
+      'maximum': None,
+      'minimum': None,
+      'too_big': 'High $K$ parameter (energy spectrum)',
+      'too_small': 'Low $K$ parameter (energy spectrum)',
    },
 }
 
-def calc_accept_param_range(outdir, cat_name, cat, scint_info):
+def calc_accept_param_range(cat_name,  info):
    '''
    Calculates the acceptable parameter range
+   `cat_name` - The key of an item contained in `acceptance_lib`
+   `info` - A list of dictionaries where the list maps to scintilaltors and the dictionary maps to values of the categories of `acceptance_lib` 
    '''
+   cat = acceptance_lib[cat_name]
    minimum, maximum = cat['minimum'], cat['maximum'] # Use defined ranges user has requested
    if cat['default']:
       # Set the acceptable range to be [q1-iqr, q3+iqr] 
-      col = [scint[cat_name] for scint in scint_info]
+      col = [scint[cat_name] for scint in info]
       q1,q3 = np.quantile(col,1/4), np.quantile(col,3/4)
       iqr = q3-q1
       minimum, maximum = q1-iqr*1.5, q3+iqr*1.5
    return minimum, maximum
 
-def failure_message():
-   '''
-   Prints the appropriate failure message
-   '''
-   pass
-
 def grubbs_test(data, potential_outlier, alpha = 0.05):
    '''
+   Checks if `potential_outlier` is an outlier in `data` (under the assumption that `data` has no outliers)
    https://www.itl.nist.gov/div898/handbook/eda/section3/eda35h1.htm
    https://www.geeksforgeeks.org/python/how-to-find-the-t-critical-value-in-python/
    '''
@@ -120,37 +123,78 @@ def grubbs_test(data, potential_outlier, alpha = 0.05):
    t_alpha = stats.t.ppf(1 - significance_level, N - 2)
 
    rhs = (N-1)/np.sqrt(N) * np.sqrt(t_alpha**2 / (N - 2 + t_alpha**2))
-   return G > rhs
+   return G > rhs # We reject the hypothesis of no outliers if G > RHS
 
 def pass_or_fail(outfolder, scint_lst, std_results, fit_results, logger=None):
    '''
    Determines whether or not a scintillator passes or fails and carries out the corresponding behaviour
    '''
-   # Calculate acceptance parameter values for each scintilator 
-   info = []
-   for ch in range(len(scint_lst)):
+   # Calculate test results for each scintilator 
+   info,n_scints = [],range(len(scint_lst))
+   for ch in n_scints:
       scint_info = {}
       for cat_name, cat in acceptance_lib.items():
          results = std_results if cat['std_results'] else fit_results
          scint_info[cat_name] =  cat['func'](results,ch)
       info.append(scint_info)
 
-   # Calculate acceptable ranges for acceptance parameters
+   # Initialization of `scintillator_results.xlsx`-based variables
+   results_path, n_passed, offset = outfolder / 'scintillator_results.xlsx',0,(0,0)
+   if results_path.is_file():
+      df = pd.read_excel(results_path,sheet_name='Results')
+      pass_mask = df['Success'].to_numpy(dtype=bool)
+      n_passed,offset = np.count_nonzero(pass_mask),df.shape
+
+   # Use test results to determine pass/fail status
+   ## Calculate acceptable ranges for test results
    maxima, minima = {},{}
-   for cat_name, cat in acceptance_lib.items():
-      minima[cat_name], maxima[cat_name] = calc_accept_param_range(outfolder, cat_name, cat, info)
+   for cat_name in acceptance_lib.keys():
+      minima[cat_name], maxima[cat_name] = calc_accept_param_range(cat_name, info)
 
-   '''
-   TODO: Finish writing this
-   Needs to use Grubb's test to identify outliers if default behaviour and other scintillators have already passed
-   Elif default, use iqr method 
-   else use user inputted max/min
+   ## If there is a sufficient number of passed scintillators already and the user requested default behaviour, use Grubb's test, else use calculated range
+   successes,messages = [],[]
+   for ch in n_scints:
+      success = {}
+      message = ''
+      for cat_name in acceptance_lib.keys():
+         if n_passed > 6 and acceptance_lib[cat_name]['default']:
+            data = df[cat_name][pass_mask]
+            success[cat_name] = not grubbs_test(data,scint_lst[ch][cat_name])
+         else:
+            success[cat_name] = not ((scint_lst[ch][cat_name] < minima[cat_name]) or (scint_lst[ch][cat_name] > maxima[cat_name]))
+         if not success[cat_name]:
+            fail_message = acceptance_lib[cat_name]['too_big'] if scint_lst[ch] > np.mean(data) else acceptance_lib[cat_name]['too_small']
+            message += fail_message + '\n'
+      successes.append(success)
+      messages.append(message)
 
-   Then needs to do all of the printing, results storage, plotting, etc.
-   '''
+   # Update `scintillator_results.xlsx`
+   ## Create new dataframe
+   results = {
+      'ID': scint_lst,
+      'Success': [sum(list(successes[ch].values()))==len(successes[ch]) for ch in n_scints],
+      'Message': [messages[ch] for ch in n_scints],
+   }
+   for cat_name in acceptance_lib.keys():
+      results[cat_name] = [scint_lst[ch][cat_name] for ch in n_scints]
+   new_df = pd.DataFrame(results)
 
-def update_scintillator_results():
-   '''
-   Updates the `scintillator_results.csv`
-   '''
-   pass
+   ## Append new dataframe
+   wb = openpyxl.load_workbook(results_path)
+   ws = wb['Results']
+   for row in dataframe_to_rows(new_df, index=False, header=False):
+      ws.append(row)
+
+   ## Colour cells based on whether or not they pass or fail
+   row_index = 1 + offset[0]
+   for ch in n_scints:
+      col_index = 1 + offset[1]
+      for col_title in results.keys():
+         if col_title == 'Success': 
+            fill_colour = GREENFILL if results[col_title][ch] else REDFILL
+         else:
+            fill_colour = GREENFILL if successes[ch][col_title] else REDFILL
+         ws.cell(row=row_index, column=col_index).fill = fill_colour
+            
+   ## Save results
+   wb.save(results_path)
