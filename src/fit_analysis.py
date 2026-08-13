@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 
 plot_config = {
     'Height': {
-        'title': 'Distribution of Waveform Peaks',
-        'xlabel': 'Wavelength Peak',
+        'title': 'Distribution of Pulse Heights',
+        'xlabel': 'Pulse Height',
         'units': 'mV',
     },
     'Energy': {
@@ -18,7 +18,7 @@ plot_config = {
 }
 
 class FitResult:
-   def __init__(self, data, ana_name, ch, fit_tests, logger=None, save=False):
+   def __init__(self, data, ana_name, ch, fit_tests=None, logger=None, save=False):
       self.ana_name = ana_name
       self.ana = al.fit_lib[ana_name]
       self.ch = ch

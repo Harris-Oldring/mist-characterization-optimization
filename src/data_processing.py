@@ -3,7 +3,7 @@ import uproot
 import numpy as np
 
 class Data:
-    def __init__(self):
+    def __init__(self,id=None):
         self.db = dict()
         self.NEvents = 0
         self.branches = []
@@ -12,6 +12,7 @@ class Data:
         self.channel = -1
         self.event_rate = 0
         self.Eoverflows = 0
+        self.id = id
 
     def __add__(self,other):
         if type(other)!=type(self):
@@ -33,7 +34,7 @@ class Data:
                 if dtype not in nkeys:
                     newdata.db[dtype]=mdata.db[dtype]
                 else:
-                    newdata.db[dtype]=np.append(self.db[dtype],other.db[dtype])
+                    newdata.db[dtype]=np.concatenate((self.db[dtype],other.db[dtype]), axis=0)
             sorted_indices = np.argsort(newdata.db['Time'])
             for dtype in newdata.db.keys():
                 # Energy has fewer events (overflow was removed)
@@ -51,6 +52,7 @@ class Data:
             newdata.event_rate = newdata.compute_event_rate()
             newdata.Eoverflows = self.Eoverflows + other.Eoverflows
             newdata.channel = self.channel if self.channel == other.channel else 'all'
+            newdata.id = self.id
 
             return newdata
         
@@ -64,16 +66,26 @@ class Data:
             for dtype in self.db.keys():
                 if dtype == 'Energy':
                     newdata.db['Energy']=self.db['Energy'][other[:len(self.db['Energy'])]]
-                newdata.db[dtype]=self.db[dtype][other]
+                else:
+                    newdata.db[dtype]=self.db[dtype][other]
             sorted_indices = np.argsort(newdata.db['Time'])
             for dtype in newdata.db.keys():
-                newdata.db[dtype]=newdata.db[dtype][sorted_indices]
+                # Energy has fewer events (overflow was removed)
+                if dtype == 'Energy':
+                    mask = np.array(sorted_indices) < len(newdata.db['Energy'])
+                    newdata.db['Energy']=newdata.db['Energy'][sorted_indices[mask]]
+                # elif dtype == 'Height':
+                #     mask = np.array(sorted_indices) < len(newdata.db['Height'])
+                #     newdata.db['Height']=newdata.db['Height'][sorted_indices[mask]]
+                else:
+                    newdata.db[dtype]=newdata.db[dtype][sorted_indices]
 
             t_arr = newdata.db['Time']
             newdata.NEvents = len(t_arr)
             newdata.duration = t_arr[-1] - t_arr[0]
             newdata.Eoverflows = newdata.NEvents - len(newdata.db['Energy'])
             newdata.event_rate = newdata.compute_event_rate()
+            newdata.id = self.id
 
             return newdata
     
@@ -81,7 +93,7 @@ class Data:
         base = [self.channel, self.NEvents, self.duration, self.event_rate, self.Eoverflows]
         return f'  {base[0]:>11} | {base[1]:>20} | {base[2]:>10.0f} s | {base[3]:>13} (events/s) | {base[4]:>20.0f} '
 
-    def load_file(self,fname,n_max=None,mask_overflow=True):
+    def load_file(self,fname,n_max=None,mask_overflow=True,lowmem=True):
         '''
         Given the name of a root file, return np arrays with relevant data.
         file - the filename of the .root file to be loaded
@@ -107,11 +119,13 @@ class Data:
         time = timestamp/1e12 # Convert picoseconds to seconds
         height = []
         baseline = []
+        waves = []
         for wave in tree["Samples"].array(entry_stop=self.NEvents, library="np"):
             b = np.mean(wave[:N_BASELINE])
             m = np.max(wave[N_BASELINE:]) if POS_POLARITY else np.min(wave[N_BASELINE:])
             height += [(m-b)*LSB]
             baseline.append(b*LSB)
+            if not lowmem: waves.append(np.array(wave)*LSB - OFFSET)
         
         sorted_indices = np.argsort(time) # Sorts based on time
         self.db['Time']=np.array(time)[sorted_indices]
@@ -119,6 +133,7 @@ class Data:
         self.db['Baseline']=np.array(baseline)[sorted_indices]
         self.db['Energy']=np.array(tree["Energy"].array(entry_stop=self.NEvents, library="np"))[sorted_indices]
         self.db['Channel']=np.array(tree["Channel"].array(entry_stop=self.NEvents, library="np"))[sorted_indices]
+        if not lowmem: self.db['Signal']=np.array(waves)[sorted_indices]
         self.duration= time[-1]-time[0]       
         self.channel = self.db['Channel'][0]
         self.event_rate = self.compute_event_rate()
@@ -144,13 +159,13 @@ class Data:
         n = float(len(times))
         return f"{n/duration:.2f} ± {float(np.sqrt(n))/duration:.2f}"
 
-    def get_overflow_mask(self,convert=False, display=False):
+    def get_overflow_mask(self, display=False):
         '''
         Identifies overflow events based on the energy data and removes them from the target data, since overflow data turns up as
         energies where the energy is at its maximum representable value (2^N - 1).
         Returns a mask that can be applied to the data to remove overflow events and the number of overflow events identified.
         '''
-        max_val = (max(self.db['Energy']) + OFFSET)/LSB if convert else max(self.db['Energy'])
+        max_val = max(self.db['Energy'])
         mask=self.db['Energy']!=max_val if np.log2(max_val+1).is_integer() else np.ones_like(self.db['Energy'], dtype=bool)
         Noverflow=len(mask)-np.sum(mask)
 
