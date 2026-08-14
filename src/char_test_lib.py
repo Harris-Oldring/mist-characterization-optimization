@@ -174,14 +174,31 @@ def pass_or_fail(outfolder, scint_lst, std_results, fit_results, logger=None):
       'ID': scint_lst,
       'Success': [sum(list(successes[ch].values()))==len(successes[ch]) for ch in n_scints],
       'Message': [messages[ch] for ch in n_scints],
+      'Attempt': [1,1,1,1]
    }
    for cat_name in acceptance_lib.keys():
       results[cat_name] = [scint_lst[ch][cat_name] for ch in n_scints]
    new_df = pd.DataFrame(results)
 
-   ## Append new dataframe
+   ## Open the worksheet
    wb = openpyxl.load_workbook(results_path)
    ws = wb['Results']
+
+   ## Update the worksheet to avoid duplicate scintillators
+   if results_path.is_file():
+      existing_df = pd.read_excel(results_path,sheet_name='Results')
+      to_drop = []
+      for row in existing_df.itertuples():
+         if row.ID in scint_lst:
+            to_drop.append(row.index)
+            i=0
+            while scint_lst[i] != row.ID: i+=1
+            new_df['Attempt'][i] += row.Attempt
+
+      for idx in to_drop.reverse(): ws.delete_rows(idx=idx+1, amount=1)
+      offset = existing_df.shape
+
+   ## Append rows
    for row in dataframe_to_rows(new_df, index=False, header=False):
       ws.append(row)
 
