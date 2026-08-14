@@ -128,6 +128,10 @@ def grubbs_test(data, potential_outlier, alpha = 0.05):
 def pass_or_fail(outfolder, scint_lst, std_results, fit_results, logger=None):
    '''
    Determines whether or not a scintillator passes or fails and carries out the corresponding behaviour
+   outfolder - A Pathlib object representing the directory you are sending all of your results to
+   scint_lst - A list of the scintillator IDs where each index of the list corresponds to the channel from that scintillator
+   std_results - A list of lists with a header and data for each channel (Channel, Number of Events, Duration, Event Rate, Energy Overflows)
+   fit_results - A dictionary of lists, where each key is a fit type and each list is the results for that channel
    '''
    # Calculate test results for each scintilator 
    info,n_scints = [],range(len(scint_lst))
